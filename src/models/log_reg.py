@@ -1,0 +1,1 @@
+"""Régression logistique multinomiale."""

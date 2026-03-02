@@ -1,0 +1,59 @@
+[project]
+name = "Projet-ML"
+version = "0.6.0"
+description = "Aide a la detection de cancer"
+authors = [{ name = "MENON Valentin", email = "valentin.menon@efrei.net" }]
+requires-python = ">=3.12, <4.0"
+
+[tool.poetry]
+packages = [{ include = "src" }]
+
+[tool.poetry.group.dev.dependencies]
+pylint = "3.3.7"
+black = "25.1.0"
+radon = "6.0.1"
+taskipy = "1.14.1"
+ipykernel = "^7.2.0"
+
+[tool.poetry.dependencies]
+black = ">=25.1.0,<26.0.0"
+tensorflow = "^2.20.0"
+opencv-python = "^4.13.0.92"
+matplotlib = "^3.10.8"
+
+
+[tool.taskipy.tasks]
+# All commands starting with `poetry run task <task_name>`
+dev = "python scripts/run_training.py"
+t1 = "python scripts/run_training.py"
+radon = "radon cc src -na -s --exclude hardware_components_models && radon mi src --ignore hardware_components_models"
+radon_raw = "radon raw src --ignore hardware_components_models"
+radon_hal = "radon hal src --ignore hardware_components_models"
+black = "black --config pyproject.toml src"
+pylint = "pylint --rcfile config/.pylintrc --enable-all-extensions src"
+lint = """
+poetry run task black && \
+poetry run task pylint
+"""
+vulture = "vulture src"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+exclude = '''
+/(
+    .*\.pyi
+    | build
+    | dist
+    | \.venv
+    | \.git
+    | \.mypy_cache
+    | \.tox
+    | \.eggs
+    | \.pytest_cache
+)/
+'''
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
