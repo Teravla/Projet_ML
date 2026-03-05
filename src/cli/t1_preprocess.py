@@ -4,18 +4,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-import sys
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from src.data.augment import augment_batch, create_training_augmenter
 from src.data.loader import load_dataset_split, summarize_split
 from src.data.preprocess import preprocess_dataset
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse les arguments de la ligne de commande."""
     parser = argparse.ArgumentParser(
         description="Task 1 - Data Exploration and Preprocessing"
     )
@@ -35,6 +30,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def print_split_summary(split_name: str, summary: dict[str, int]) -> None:
+    """Affiche un résumé clair de la distribution des classes pour un split."""
     total = sum(summary.values())
     print(f"\n[{split_name}] distribution des classes (total={total})")
     for class_name, count in summary.items():
@@ -42,6 +38,7 @@ def print_split_summary(split_name: str, summary: dict[str, int]) -> None:
 
 
 def main() -> None:
+    """Point d'entrée principal pour la tâche 1."""
     args = parse_args()
     data_dir = Path(args.data_dir)
     train_dir = data_dir / "Training"

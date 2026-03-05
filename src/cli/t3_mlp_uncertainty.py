@@ -4,16 +4,10 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-import sys
 
 import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from src.data.loader import load_dataset_split
 from src.data.preprocess import preprocess_dataset
 from src.models.log_reg import flatten_images
@@ -26,6 +20,7 @@ from src.models.uncertainty import mc_dropout_predict, summarize_uncertainty
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse les arguments de la ligne de commande."""
     parser = argparse.ArgumentParser(
         description="Task 3 - Probabilistic MLP with Uncertainty Management"
     )
@@ -46,6 +41,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Point d'entrée principal pour la tâche 3."""
     args = parse_args()
 
     effective_img_size = args.img_size

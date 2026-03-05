@@ -2,7 +2,10 @@
 """Display formatted help for available tasks with colors."""
 
 
-class Colors:
+from enum import StrEnum
+
+
+class Colors(StrEnum):
     """ANSI color codes for terminal output."""
 
     HEADER = "\033[95m"  # Magenta

@@ -18,9 +18,6 @@ import keras
 import numpy as np
 from datetime import datetime
 
-# Ajouter le répertoire racine au path
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.loader import load_dataset_split, discover_classes, DatasetSplit
 from src.data.preprocess import preprocess_dataset
@@ -40,6 +37,8 @@ from src.decision.triage import (
     statistiques_triage,
 )
 from src.config.thresholds import DecisionThresholds
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args():
@@ -110,7 +109,6 @@ def charger_modele(model_type: str, input_shape, num_classes: int):
     Note: Cette version simplifiée crée un nouveau modèle.
     Dans un contexte réel, on chargerait un modèle pré-entraîné depuis artifacts/.
     """
-    import tensorflow as tf
 
     if model_type == "logreg":
         # Simuler un modèle logistique simple

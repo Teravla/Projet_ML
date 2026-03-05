@@ -19,6 +19,14 @@ from src.models.mlp import build_mlp_classifier
 NUM_CLASSES = 4
 TARGET_ACCURACY = 0.90
 
+# Model type identifiers
+MODEL_TYPE_CNN = "cnn"
+MODEL_TYPE_MLP = "mlp"
+MODEL_TYPE_TRANSFER = "transfer"
+
+# Evaluation thresholds
+ENSEMBLE_THRESHOLD = 0.5
+
 
 @dataclass(frozen=True)
 class TrainConfig:
@@ -92,7 +100,9 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help="Utiliser l'architecture CNN optimisee (active par defaut)",
     )
-    parser.add_argument("--cnn", action="store_true", help="Entrainer le modele CNN simple")
+    parser.add_argument(
+        "--cnn", action="store_true", help="Entrainer le modele CNN simple"
+    )
     parser.add_argument("--mlp", action="store_true", help="Entrainer le modele MLP")
     parser.add_argument(
         "--transfer",
@@ -123,8 +133,12 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help="Tester plusieurs configs CNN et garder la meilleure",
     )
-    parser.add_argument("--sweep-trials", type=int, default=6, help="Nombre d'essais sweep")
-    parser.add_argument("--sweep-epochs", type=int, default=12, help="Epochs par essai sweep")
+    parser.add_argument(
+        "--sweep-trials", type=int, default=6, help="Nombre d'essais sweep"
+    )
+    parser.add_argument(
+        "--sweep-epochs", type=int, default=12, help="Epochs par essai sweep"
+    )
     parser.add_argument(
         "--final-train",
         action=argparse.BooleanOptionalAction,
@@ -254,13 +268,14 @@ def train_model_with_augmentation(
         .shuffle(buffer_size=len(x_train), reshuffle_each_iteration=True)
         .batch(config.batch_size)
     )
-    if use_augmentation:
-        train_ds = base_ds.map(
+    train_ds = (
+        base_ds.map(
             lambda x, y: (train_augmentation(x, training=True), y),
             num_parallel_calls=tf.data.AUTOTUNE,
         ).prefetch(tf.data.AUTOTUNE)
-    else:
-        train_ds = base_ds.prefetch(tf.data.AUTOTUNE)
+        if use_augmentation
+        else base_ds.prefetch(tf.data.AUTOTUNE)
+    )
 
     return model.fit(
         train_ds,
@@ -271,7 +286,9 @@ def train_model_with_augmentation(
     )
 
 
-def predict_with_tta(model: keras.Model, x_data: np.ndarray, tta_rounds: int = 5) -> np.ndarray:
+def predict_with_tta(
+    model: keras.Model, x_data: np.ndarray, tta_rounds: int = 5
+) -> np.ndarray:
     """Prediction TTA en moyennant plusieurs vues augmentees."""
 
     tta_aug = keras.Sequential(
@@ -441,7 +458,9 @@ def train_cnn_pipeline(
             )
             if bool(best_cfg["focal"]):
                 cnn_model.compile(
-                    optimizer=keras.optimizers.Adam(learning_rate=float(best_cfg["lr"])),
+                    optimizer=keras.optimizers.Adam(
+                        learning_rate=float(best_cfg["lr"])
+                    ),
                     loss=sparse_focal_loss(gamma=2.0, alpha=0.35),
                     metrics=["accuracy"],
                 )
@@ -449,7 +468,9 @@ def train_cnn_pipeline(
                 model=cnn_model,
                 train_data=(data.x_train, data.y_train),
                 validation_data=(data.x_val, data.y_val),
-                config=TrainConfig(epochs=sweep_cfg.final_epochs, batch_size=train_cfg.batch_size),
+                config=TrainConfig(
+                    epochs=sweep_cfg.final_epochs, batch_size=train_cfg.batch_size
+                ),
                 use_augmentation=bool(best_cfg["augment"]),
             )
         return cnn_model
@@ -508,7 +529,9 @@ def train_mlp_pipeline(data: DataBundle, train_cfg: TrainConfig) -> keras.Model:
     return mlp_model
 
 
-def train_transfer_pipeline(data: DataBundle, train_cfg: TrainConfig) -> keras.Model | None:
+def train_transfer_pipeline(
+    data: DataBundle, train_cfg: TrainConfig
+) -> keras.Model | None:
     """Entraine le modele transfer learning, retourne None en cas d'echec."""
 
     model_transfer = build_transfer_learning_model(data.x_train.shape[1:])
@@ -537,10 +560,10 @@ def predict_logits(
 ) -> np.ndarray:
     """Retourne les logits adaptes selon le type de modele."""
 
-    if model_name == "mlp":
+    if model_name == MODEL_TYPE_MLP:
         x_input = x_test.reshape(x_test.shape[0], -1)
         return model.predict(x_input, verbose=0)
-    if use_tta and model_name == "cnn":
+    if use_tta and model_name == MODEL_TYPE_CNN:
         return predict_with_tta(model, x_test, tta_rounds=5)
     return model.predict(x_test, verbose=0)
 
@@ -592,7 +615,9 @@ def ensemble_or_best(
     """Construit une prediction d'ensemble sinon retourne la meilleure prediction."""
 
     if use_ensemble and len(logits_by_model) > 1:
-        valid_names = [name for name, acc in accuracy_by_model.items() if acc > 0.50]
+        valid_names = [
+            name for name, acc in accuracy_by_model.items() if acc > ENSEMBLE_THRESHOLD
+        ]
         if len(valid_names) > 1:
             raw_weights = [accuracy_by_model[name] ** 2 for name in valid_names]
             weight_sum = sum(raw_weights)
@@ -720,19 +745,21 @@ def train_selected_models(
 
     trained: dict[str, keras.Model] = {}
 
-    if "cnn" in app_cfg.active_models:
+    if MODEL_TYPE_CNN in app_cfg.active_models:
         print("\n[2/5] Pipeline CNN...")
-        trained["cnn"] = train_cnn_pipeline(data, app_cfg, train_cfg, sweep_cfg)
+        trained[MODEL_TYPE_CNN] = train_cnn_pipeline(
+            data, app_cfg, train_cfg, sweep_cfg
+        )
 
-    if "mlp" in app_cfg.active_models:
+    if MODEL_TYPE_MLP in app_cfg.active_models:
         print("\n[3/5] Entrainement MLP...")
-        trained["mlp"] = train_mlp_pipeline(data, train_cfg)
+        trained[MODEL_TYPE_MLP] = train_mlp_pipeline(data, train_cfg)
 
-    if "transfer" in app_cfg.active_models:
+    if MODEL_TYPE_TRANSFER in app_cfg.active_models:
         print("\n[4/5] Entrainement Transfer Learning...")
         transfer_model = train_transfer_pipeline(data, train_cfg)
         if transfer_model is not None:
-            trained["transfer"] = transfer_model
+            trained[MODEL_TYPE_TRANSFER] = transfer_model
 
     return trained
 

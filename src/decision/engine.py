@@ -59,12 +59,11 @@ def categoriser_confiance(
 
     if confiance >= seuils.haute:
         return "HAUTE"
-    elif confiance >= seuils.moyenne:
+    if confiance >= seuils.moyenne:
         return "MOYENNE"
-    elif confiance >= seuils.faible:
+    if confiance >= seuils.faible:
         return "FAIBLE"
-    else:
-        return "TRES_FAIBLE"
+    return "TRES_FAIBLE"
 
 
 def generer_decision_clinique(

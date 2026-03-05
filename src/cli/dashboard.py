@@ -9,34 +9,45 @@ Usage:
     Puis ouvrir: http://localhost:5000/dashboard
 """
 
-import sys
+import traceback
 from pathlib import Path
-import keras
-import numpy as np
 from datetime import datetime
 from typing import Optional
 from io import BytesIO
+import keras
+import numpy as np
 from reportlab.pdfgen import canvas
-
-try:
-    from flask import Flask, jsonify, request, make_response
-except ImportError:
-    print("Flask not installed. Install with: pip install flask")
-    sys.exit(1)
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT))
-
+from flask import Flask, jsonify, request, make_response
 from src.decision.engine import generer_recommandation
 from src.decision.rules import appliquer_regle_securite_negatif
 from src.decision.triage import appliquer_triage
 from src.evaluation.analysis import analyser_performance_sad
 from src.data.loader import load_dataset_split
+from src.reporting.report_generator import creer_rapport_decision
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 app = Flask(__name__, static_folder=str(PROJECT_ROOT / "web"), static_url_path="")
 
 CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
 RNG = np.random.default_rng(42)
+
+# Confidence level constants
+CONFIDENCE_HAUTE = "HAUTE"
+CONFIDENCE_MOYENNE = "MOYENNE"
+CONFIDENCE_FAIBLE = "FAIBLE"
+CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
+
+# Priority constants
+PRIORITY_URGENTE = "URGENTE"
+PRIORITY_ELEVEE = "Elevee"
+PRIORITY_ELEVEE_ACCENT = "Élevée"
+PRIORITY_NORMALE = "Normale"
+PRIORITY_ROUTINE = "Routine"
+
+# Class name constant
+CLASS_NO_TUMOR = "notumor"
 
 # Global model state
 MODEL_STATE = {
@@ -67,123 +78,151 @@ def find_latest_model() -> Optional[Path]:
     return max(model_files, key=lambda p: p.stat().st_mtime)
 
 
+def get_image_size_from_model(model: keras.Model) -> tuple[int, int]:
+    """Extrait la taille d'image du modèle ou retourne la taille par défaut."""
+    default_size = (224, 224)
+    input_shape = model.input_shape
+    if len(input_shape) > 1:
+        return (input_shape[1], input_shape[2])
+    return default_size
+
+
+def load_test_data(img_size: tuple[int, int]) -> tuple:
+    """Charge les données de test."""
+    test_dir = PROJECT_ROOT / "data" / "Testing"
+    if not test_dir.exists():
+        raise FileNotFoundError("Répertoire 'data/Testing' non trouvé")
+
+    test_split = load_dataset_split(test_dir, image_size=img_size)
+    return test_split.images, test_split.labels, test_split.class_names
+
+
 def load_model_and_data() -> bool:
     """Charge le modèle et les données de test."""
-    try:
-        model_path = find_latest_model()
-        if not model_path:
-            MODEL_STATE["error_message"] = "Aucun modèle trouvé. Lancez l'entraînement."
-            MODEL_STATE["model_loaded"] = False
-            return False
-
-        # Charger le modèle
-        print(f"📦 Chargement du modèle: {model_path.name}")
-        MODEL_STATE["model"] = keras.models.load_model(model_path)
-        MODEL_STATE["model_path"] = str(model_path)
-
-        # Charger les données de test
-        print("📊 Chargement des données de test...")
-        img_size = (224, 224)  # Default size, can be adjusted
-
-        # Chercher la taille d'image à partir du modèle input shape
-        try:
-            input_shape = MODEL_STATE["model"].input_shape
-            if len(input_shape) > 1:
-                img_size = (input_shape[1], input_shape[2])
-        except:
-            pass
-
-        test_dir = PROJECT_ROOT / "data" / "Testing"
-        if not test_dir.exists():
-            MODEL_STATE["error_message"] = "Répertoire 'data/Testing' non trouvé"
-            MODEL_STATE["model_loaded"] = False
-            return False
-
-        test_split = load_dataset_split(test_dir, image_size=img_size)
-        MODEL_STATE["test_images"] = test_split.images
-        MODEL_STATE["test_labels"] = test_split.labels
-        MODEL_STATE["class_names"] = test_split.class_names
-        MODEL_STATE["model_loaded"] = True
-        MODEL_STATE["error_message"] = None
-
-        print(f"✓ Modèle chargé: {model_path.name}")
-        print(f"✓ Données de test chargées: {len(test_split.images)} images")
-        return True
-
-    except Exception as e:
-        MODEL_STATE["error_message"] = f"Erreur lors du chargement: {str(e)}"
+    model_path = find_latest_model()
+    if not model_path:
+        MODEL_STATE["error_message"] = "Aucun modèle trouvé. Lancez l'entraînement."
         MODEL_STATE["model_loaded"] = False
-        print(f"❌ Erreur: {str(e)}")
         return False
+
+    # Charger le modèle
+    print(f"[*] Chargement du modèle: {model_path.name}")
+    MODEL_STATE["model"] = keras.models.load_model(model_path)
+    MODEL_STATE["model_path"] = str(model_path)
+
+    # Charger les données de test
+    print("[*] Chargement des données de test...")
+    img_size = get_image_size_from_model(MODEL_STATE["model"])
+    images, labels, class_names = load_test_data(img_size)
+
+    MODEL_STATE["test_images"] = images
+    MODEL_STATE["test_labels"] = labels
+    MODEL_STATE["class_names"] = class_names
+    MODEL_STATE["model_loaded"] = True
+    MODEL_STATE["error_message"] = None
+
+    print(f"[OK] Modèle chargé: {model_path.name}")
+    print(f"[OK] Données de test chargées: {len(images)} images")
+    return True
+
+
+def normalize_images(images: np.ndarray) -> np.ndarray:
+    """Normalise les images si nécessaire."""
+    return images / 255.0 if images.max() > 1.0 else images
+
+
+def apply_softmax(predictions: np.ndarray) -> np.ndarray:
+    """Applique softmax pour obtenir des probabilités normalisées."""
+    exp_pred = np.exp(predictions - np.max(predictions))
+    return exp_pred / exp_pred.sum()
+
+
+def create_decision_for_case(
+    label: int, pred: np.ndarray, case_index: int, class_names: list[str]
+) -> tuple:
+    """Crée une décision pour un cas donné."""
+    pid = f"P_{case_index+1:05d}"
+    probas = apply_softmax(pred)
+
+    # Générer la recommandation basée sur les vraies probabilités
+    decision = generer_recommandation(probas, class_names, patient_id=pid)
+    decision = appliquer_regle_securite_negatif(decision)
+    decision = appliquer_triage(decision)
+
+    true_label = class_names[int(label)]
+    return decision, true_label
+
+
+def get_test_data_samples(n_cases: int) -> tuple[np.ndarray, np.ndarray]:
+    """Récupère des échantillons aléatoires des données de test."""
+    test_images = MODEL_STATE["test_images"]
+    test_labels = MODEL_STATE["test_labels"]
+
+    # Type guard for unsubscriptable check
+    if test_images is None or test_labels is None:
+        raise ValueError("Test data not available")
+
+    # Assert type for pylint
+    assert isinstance(test_images, np.ndarray)
+    assert isinstance(test_labels, np.ndarray)
+
+    # Shuffler les indices pour avoir un mix de classes
+    total_samples = len(test_images)
+    indices = np.random.choice(
+        total_samples, size=min(n_cases, total_samples), replace=False
+    )
+
+    # pylint: disable=unsubscriptable-object
+    return test_images[indices], test_labels[indices]
+
+
+def process_predictions_to_decisions(
+    labels: np.ndarray, predictions: np.ndarray, class_names: list[str]
+) -> tuple[list, list]:
+    """Transforme les prédictions en décisions SAD."""
+    decisions = []
+    true_labels = []
+    for i, (label, pred) in enumerate(zip(labels, predictions)):
+        decision, true_label = create_decision_for_case(label, pred, i, class_names)
+        decisions.append(decision)
+        true_labels.append(true_label)
+    return decisions, true_labels
+
+
+def generate_model_predictions(n_cases: int) -> tuple[list, list]:
+    """Génère les prédictions et les décisions depuis le modèle."""
+    selected_images, selected_labels = get_test_data_samples(n_cases)
+    normalized_images = normalize_images(selected_images)
+    predictions = MODEL_STATE["model"].predict(normalized_images, verbose=0)
+    return process_predictions_to_decisions(
+        selected_labels, predictions, MODEL_STATE["class_names"]
+    )
 
 
 def generate_decisions_from_model(n_cases: int = 120) -> list:
     """Génère les décisions basées sur les prédictions du modèle réel."""
     if not MODEL_STATE["model_loaded"] or MODEL_STATE["model"] is None:
-        # Fallback sur les données simulées si pas de modèle
         return generate_decisions_simulated(n_cases)
 
     try:
-        # Shuffler les indices pour avoir un mix de classes (éviter de prendre que glioma)
-        total_samples = len(MODEL_STATE["test_images"])
-        indices = np.random.choice(
-            total_samples, size=min(n_cases, total_samples), replace=False
-        )
-
-        # Prendre les cas correspondants aux indices shufflés
-        test_images = MODEL_STATE["test_images"][indices]
-        test_labels = MODEL_STATE["test_labels"][indices]
-
-        # Normaliser les images [0-1] si nécessaire (le modèle a été entraîné avec normalisation)
-        if test_images.max() > 1.0:
-            test_images_normalized = test_images / 255.0
-        else:
-            test_images_normalized = test_images
-
-        # Faire les prédictions
-        predictions = MODEL_STATE["model"].predict(test_images_normalized, verbose=0)
-
-        decisions = []
-        true_labels = []
-        for i, (image, label, pred) in enumerate(
-            zip(test_images, test_labels, predictions)
-        ):
-            pid = f"P_{i+1:05d}"
-
-            # Appliquer softmax pour obtenir des probabilités normalisées [0,1]
-            # Le modèle peut ne pas avoir de softmax en dernière couche
-            exp_pred = np.exp(pred - np.max(pred))  # Stabilité numérique
-            probas = exp_pred / exp_pred.sum()
-
-            # Générer la recommandation basée sur les vraies probabilités
-            d = generer_recommandation(
-                probas, MODEL_STATE["class_names"], patient_id=pid
-            )
-            d = appliquer_regle_securite_negatif(d)
-            d = appliquer_triage(d)
-            decisions.append(d)
-
-            # Stocker le vrai label
-            true_labels.append(MODEL_STATE["class_names"][int(label)])
-
-        # Mettre en cache les décisions et vrais labels pour api_metrics
-        MODEL_STATE["last_decisions"] = decisions
-        MODEL_STATE["last_true_labels"] = true_labels
-
-        return decisions
-    except Exception as e:
-        print(f"❌ Erreur lors de la génération des décisions: {str(e)}")
-        import traceback
-
+        decisions, true_labels = generate_model_predictions(n_cases)
+    except (ValueError, TypeError, KeyError) as e:
+        print(f"[ERROR] Erreur génération décisions: {str(e)}")
         traceback.print_exc()
         return generate_decisions_simulated(n_cases)
+
+    # Mettre en cache
+    MODEL_STATE["last_decisions"] = decisions
+    MODEL_STATE["last_true_labels"] = true_labels
+
+    return decisions
 
 
 def generate_decisions_simulated(n_cases: int = 120):
     """Génère des décisions simulées (fallback)."""
     probas = RNG.dirichlet(alpha=[1.4, 1.2, 1.8, 1.1], size=n_cases)
 
-    for idx in [7, 33, 89]:
+    for idx in (7, 33, 89):
         if idx < n_cases:
             probas[idx] = np.array([0.02, 0.03, 0.92, 0.03])
 
@@ -335,17 +374,21 @@ def api_stats():
     decisions, _ = get_or_generate_decisions(n_cases=120)
 
     n_total = len(decisions)
-    n_haute = sum(1 for d in decisions if d.niveau_confiance == "HAUTE")
-    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == "MOYENNE")
-    n_faible = sum(1 for d in decisions if d.niveau_confiance == "FAIBLE")
-    n_tres_faible = sum(1 for d in decisions if d.niveau_confiance == "TRES_FAIBLE")
-
-    n_urgente = sum(1 for d in decisions if "URGENTE" in d.priorite)
-    n_elevee = sum(
-        1 for d in decisions if "Elevee" in d.priorite or "Élevée" in d.priorite
+    n_haute = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_HAUTE)
+    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_MOYENNE)
+    n_faible = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_FAIBLE)
+    n_tres_faible = sum(
+        1 for d in decisions if d.niveau_confiance == CONFIDENCE_TRES_FAIBLE
     )
-    n_normale = sum(1 for d in decisions if "Normale" in d.priorite)
-    n_routine = sum(1 for d in decisions if "Routine" in d.priorite)
+
+    n_urgente = sum(1 for d in decisions if PRIORITY_URGENTE in d.priorite)
+    n_elevee = sum(
+        1
+        for d in decisions
+        if PRIORITY_ELEVEE in d.priorite or PRIORITY_ELEVEE_ACCENT in d.priorite
+    )
+    n_normale = sum(1 for d in decisions if PRIORITY_NORMALE in d.priorite)
+    n_routine = sum(1 for d in decisions if PRIORITY_ROUTINE in d.priorite)
 
     n_alertes = sum(1 for d in decisions if d.alerte_securite)
     n_revisions = sum(1 for d in decisions if d.revision_requise)
@@ -396,6 +439,117 @@ def api_stats():
     )
 
 
+def draw_pdf_header(
+    c: canvas.Canvas, patient_id: str, y_pos: float, line_height: float
+) -> float:
+    """Dessine l'en-tête du PDF."""
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(50, y_pos, "=" * 60)
+    y_pos -= line_height
+    c.drawString(50, y_pos, "RAPPORT D'AIDE A LA DECISION")
+    y_pos -= line_height
+    c.drawString(50, y_pos, "=" * 60)
+    y_pos -= line_height * 1.5
+
+    c.setFont("Helvetica", 10)
+    c.drawString(
+        50,
+        y_pos,
+        f"Patient ID: {patient_id}   Date: {datetime.now().strftime('%d/%m/%Y')}",
+    )
+    return y_pos - line_height * 2
+
+
+def draw_pdf_prediction(
+    c: canvas.Canvas, decision, y_pos: float, line_height: float
+) -> float:
+    """Dessine la section prédiction principale."""
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(50, y_pos, "PREDICTION PRINCIPALE")
+    y_pos -= line_height * 0.8
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y_pos, "---")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Classe: {decision.classe_predite}")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Confiance: {decision.confiance*100:.1f}%")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Niveau de certitude: {decision.niveau_confiance}")
+    return y_pos - line_height * 1.5
+
+
+def draw_pdf_scores(
+    c: canvas.Canvas, decision, y_pos: float, line_height: float
+) -> float:
+    """Dessine la section scores par classe."""
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(50, y_pos, "SCORES PAR CLASSE")
+    y_pos -= line_height * 0.8
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y_pos, "---")
+    y_pos -= line_height
+
+    for classe, prob in sorted(
+        decision.probabilites.items(), key=lambda x: x[1], reverse=True
+    ):
+        c.drawString(50, y_pos, f"• {classe}: {prob*100:.1f}%")
+        y_pos -= line_height
+
+    return y_pos - line_height * 0.5
+
+
+def draw_pdf_recommendations(
+    c: canvas.Canvas, decision, y_pos: float, line_height: float
+) -> float:
+    """Dessine la section recommandations cliniques."""
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(50, y_pos, "RECOMMANDATIONS CLINIQUES")
+    y_pos -= line_height * 0.8
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y_pos, "---")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Diagnostic: {decision.decision}")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Action: {decision.action_recommandee}")
+    y_pos -= line_height
+    c.drawString(50, y_pos, f"Priorite: {decision.priorite}")
+    y_pos -= line_height
+    revision_text = (
+        "Requise" if decision.revision_requise else "Optionnelle (validation finale)"
+    )
+    c.drawString(50, y_pos, f"Revision humaine: {revision_text}")
+    return y_pos - line_height * 1.5
+
+
+def draw_pdf_attention(
+    c: canvas.Canvas, decision, y_pos: float, line_height: float
+) -> float:
+    """Dessine la section éléments d'attention."""
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(50, y_pos, "ELEMENTS D'ATTENTION")
+    y_pos -= line_height * 0.8
+    c.setFont("Helvetica", 10)
+    c.drawString(50, y_pos, "---")
+    y_pos -= line_height
+
+    if decision.alerte_securite:
+        c.drawString(50, y_pos, "• [ALERTE] Revision obligatoire detectee")
+        y_pos -= line_height
+
+    if decision.classe_predite != CLASS_NO_TUMOR:
+        c.drawString(50, y_pos, "• Tumeur suspecte detectee")
+        y_pos -= line_height
+        c.drawString(50, y_pos, "• IRM de controle recommandee")
+        y_pos -= line_height
+    else:
+        c.drawString(50, y_pos, "• Pas de tumeur detectee")
+        y_pos -= line_height
+
+    y_pos -= line_height
+    c.drawString(50, y_pos, "=" * 60)
+    return y_pos
+
+
 @app.route("/api/rapport/<patient_id>/pdf", methods=["GET"])
 def api_rapport_pdf(patient_id: str):
     """Génère un rapport PDF pour un patient."""
@@ -412,97 +566,15 @@ def api_rapport_pdf(patient_id: str):
 
     # Configuration
     c.setFont("Helvetica", 11)
-    y = 750
+    y = 750.0
     line_height = 15
 
-    # En-tête
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(50, y, "=" * 60)
-    y -= line_height
-    c.drawString(50, y, "RAPPORT D'AIDE A LA DECISION")
-    y -= line_height
-    c.drawString(50, y, "=" * 60)
-    y -= line_height * 1.5
-
-    # Patient info
-    c.setFont("Helvetica", 10)
-    c.drawString(
-        50, y, f"Patient ID: {patient_id}   Date: {datetime.now().strftime('%d/%m/%Y')}"
-    )
-    y -= line_height * 2
-
-    # Prédiction principale
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "PREDICTION PRINCIPALE")
-    y -= line_height * 0.8
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, "---")
-    y -= line_height
-    c.drawString(50, y, f"Classe: {decision.classe_predite}")
-    y -= line_height
-    c.drawString(50, y, f"Confiance: {decision.confiance*100:.1f}%")
-    y -= line_height
-    c.drawString(50, y, f"Niveau de certitude: {decision.niveau_confiance}")
-    y -= line_height * 1.5
-
-    # Scores par classe
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "SCORES PAR CLASSE")
-    y -= line_height * 0.8
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, "---")
-    y -= line_height
-
-    for classe, prob in sorted(
-        decision.probabilites.items(), key=lambda x: x[1], reverse=True
-    ):
-        c.drawString(50, y, f"• {classe}: {prob*100:.1f}%")
-        y -= line_height
-
-    y -= line_height * 0.5
-
-    # Recommandations cliniques
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "RECOMMANDATIONS CLINIQUES")
-    y -= line_height * 0.8
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, "---")
-    y -= line_height
-    c.drawString(50, y, f"Diagnostic: {decision.decision}")
-    y -= line_height
-    c.drawString(50, y, f"Action: {decision.action_recommandee}")
-    y -= line_height
-    c.drawString(50, y, f"Priorite: {decision.priorite}")
-    y -= line_height
-    revision_text = (
-        "Requise" if decision.revision_requise else "Optionnelle (validation finale)"
-    )
-    c.drawString(50, y, f"Revision humaine: {revision_text}")
-    y -= line_height * 1.5
-
-    # Éléments d'attention
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(50, y, "ELEMENTS D'ATTENTION")
-    y -= line_height * 0.8
-    c.setFont("Helvetica", 10)
-    c.drawString(50, y, "---")
-    y -= line_height
-
-    if decision.alerte_securite:
-        c.drawString(50, y, "• [ALERTE] Revision obligatoire detectee")
-        y -= line_height
-
-    if decision.classe_predite != "notumor":
-        c.drawString(50, y, "• Tumeur suspecte detectee")
-        y -= line_height
-        c.drawString(50, y, "• IRM de controle recommandee")
-        y -= line_height
-    else:
-        c.drawString(50, y, "• Pas de tumeur detectee")
-        y -= line_height
-
-    y -= line_height
-    c.drawString(50, y, "=" * 60)
+    # Dessiner les sections
+    y = draw_pdf_header(c, patient_id, y, line_height)
+    y = draw_pdf_prediction(c, decision, y, line_height)
+    y = draw_pdf_scores(c, decision, y, line_height)
+    y = draw_pdf_recommendations(c, decision, y, line_height)
+    draw_pdf_attention(c, decision, y, line_height)
 
     # Sauvegarder le PDF
     c.save()
@@ -519,8 +591,6 @@ def api_rapport_pdf(patient_id: str):
 @app.route("/api/rapport/<patient_id>", methods=["GET"])
 def api_rapport(patient_id: str):
     """Retourne le rapport textuel pour un patient."""
-    from src.reporting.report_generator import creer_rapport_decision
-
     decisions, _ = get_or_generate_decisions(n_cases=120)
     decision = next((d for d in decisions if d.patient_id == patient_id), None)
 
@@ -560,7 +630,7 @@ if __name__ == "__main__":
     print("   GET  http://localhost:5000/api/rapport/<patient_id>")
     print("   GET  http://localhost:5000/api/rapport/<patient_id>/pdf  (NOUVEAU!)")
     print("   GET  http://localhost:5000/api/health")
-    print("\n🛑 Appuyer sur CTRL+C pour arrêter le serveur")
+    print("\n[STOP] Appuyer sur CTRL+C pour arrêter le serveur")
     print("=" * 70 + "\n")
 
     # Désactiver le reloader en debug pour éviter les recharges multiples du modèle

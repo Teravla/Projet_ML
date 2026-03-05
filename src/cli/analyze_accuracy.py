@@ -10,19 +10,18 @@ Identifie les goulots d'étranglement:
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 import keras
 import numpy as np
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
-import tensorflow as tf
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from src.data.loader import load_dataset_split
-from src.models.cnn import build_cnn_classifier, predict_probabilities
+from src.models.cnn import build_cnn_classifier
+
+# Thresholds and constants
+IMBALANCE_THRESHOLD = 2.0
+NORMALIZATION_MAX = 1.5
+VARIANCE_THRESHOLD = 0.001
+IMAGE_NDIM = 4
 
 
 def analyze_class_distribution(
@@ -48,8 +47,24 @@ def analyze_class_distribution(
     train_counts = np.bincount(y_train)
     imbalance_ratio = train_counts.max() / train_counts.min()
     print(f"\n⚠️  Ratio de déséquilibre: {imbalance_ratio:.2f}x")
-    if imbalance_ratio > 2.0:
+    if imbalance_ratio > IMBALANCE_THRESHOLD:
         print("    Solution: Utiliser class_weight dans le training")
+
+
+def print_confusion_matrix(
+    y_test: np.ndarray, y_pred: np.ndarray, class_names: list[str]
+) -> None:
+    """Affiche la matrice de confusion."""
+    print("\nMatrice de confusion:")
+    cm = confusion_matrix(y_test, y_pred)
+
+    header = "      " + "  ".join(f"{c[:4]:>4s}" for c in class_names)
+    print(header)
+    for idx, class_name in enumerate(class_names):
+        row_str = f"{class_name[:4]:>4s}  "
+        for val in cm[idx]:
+            row_str += f"{val:>4d} "
+        print(row_str)
 
 
 def analyze_model_predictions(
@@ -85,8 +100,10 @@ def analyze_model_predictions(
 
     # Cas mal classifiés
     wrong_mask = y_test != y_pred
+    wrong_count = wrong_mask.sum()
     print(
-        f"\nCas mal classifiés: {wrong_mask.sum()} / {len(y_test)} ({wrong_mask.sum()/len(y_test)*100:.2f}%)"
+        f"\nCas mal classifies: {wrong_count} / {len(y_test)} "
+        f"({wrong_count / len(y_test) * 100:.2f}%)"
     )
 
     if wrong_mask.sum() > 0:
@@ -94,30 +111,19 @@ def analyze_model_predictions(
         print(f"  Confiance moyenne (erreurs): {wrong_confidences.mean():.4f}")
 
     # Matrice de confusion
-    print("\nMatrice de confusion:")
-    cm = confusion_matrix(y_test, y_pred)
-
-    header = "      " + "  ".join(f"{c[:4]:>4s}" for c in class_names)
-    print(header)
-    for idx, class_name in enumerate(class_names):
-        row_str = f"{class_name[:4]:>4s}  "
-        for val in cm[idx]:
-            pct = (val / cm[idx].sum() * 100) if cm[idx].sum() > 0 else 0
-            color = "🔴" if val > 0 and idx != np.argmax(cm[idx]) else "🟢"
-            row_str += f"{val:>4d} "
-        print(row_str)
+    print_confusion_matrix(y_test, y_pred, class_names)
 
     return y_pred
 
 
-def diagnose_training_issues(x_train: np.ndarray, y_train: np.ndarray) -> None:
+def diagnose_training_issues(x_train: np.ndarray) -> None:
     """Diagnostique les problèmes potentiels de données."""
     print("\n⚙️  DIAGNOSTIC DES DONNÉES D'ENTRAÎNEMENT")
     print("=" * 70)
 
     # Vérifier les valeurs
     print(f"\nRage de pixels: [{x_train.min():.4f}, {x_train.max():.4f}]")
-    if x_train.max() > 1.5 or x_train.min() < -0.5:
+    if x_train.max() > NORMALIZATION_MAX or x_train.min() < -0.5:
         print("  ⚠️  PROBLÈME: Les données ne sont pas normalisées [0,1] ou [-1,1]")
         print("     Solution: Diviser par 255 si données brutes")
     else:
@@ -133,28 +139,25 @@ def diagnose_training_issues(x_train: np.ndarray, y_train: np.ndarray) -> None:
     # Variance
     variance = np.var(x_train)
     print(f"\nVariance globale: {variance:.6f}")
-    if variance < 0.001:
+    if variance < VARIANCE_THRESHOLD:
         print("  ⚠️  PROBLÈME: Variance très faible (données constantes?)")
     else:
         print("  ✓ Variance acceptable")
 
     # Distribution par canal
-    if len(x_train.shape) == 4:  # Images (batch, H, W, C)
-        print(f"\nMoyenne par canal:")
+    if len(x_train.shape) == IMAGE_NDIM:  # Images (batch, H, W, C)
+        print("\nMoyenne par canal:")
         for c in range(x_train.shape[-1]):
             mean_c = x_train[..., c].mean()
             print(f"  Canal {c}: {mean_c:.4f}")
 
 
-def main() -> None:
-    print("\n" + "=" * 70)
-    print("🔧 ANALYSEUR D'ACCURACY - Diagnostic detaillé")
-    print("=" * 70)
-
-    # Charger les données
-    print("\n[1/4] Chargement des données...")
+def load_and_prepare_data() -> (
+    tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]
+):
+    """Charge et prepare les donnees d'entrainement et de test."""
     data_dir = Path("data")
-    img_size = (64, 64)  # Taille actuelle
+    img_size = (64, 64)
 
     train_split = load_dataset_split(data_dir / "Training", image_size=img_size)
     test_split = load_dataset_split(
@@ -164,44 +167,35 @@ def main() -> None:
     )
 
     x_train = train_split.images.astype(np.float32) / 255.0
-    # Labels peuvent être déjà des indices (np.int64) ou des noms de classe (str)
     y_train_raw = train_split.labels
-    if isinstance(y_train_raw[0], (int, np.integer)):
-        y_train = np.array(y_train_raw, dtype=np.int64)
-    else:
-        y_train = np.array(
-            [train_split.class_names.index(label) for label in y_train_raw]
-        )
+    y_train = (
+        np.array(y_train_raw, dtype=np.int64)
+        if isinstance(y_train_raw[0], (int, np.integer))
+        else np.array([train_split.class_names.index(label) for label in y_train_raw])
+    )
 
     x_test = test_split.images.astype(np.float32) / 255.0
     y_test_raw = test_split.labels
-    if isinstance(y_test_raw[0], (int, np.integer)):
-        y_test = np.array(y_test_raw, dtype=np.int64)
-    else:
-        y_test = np.array([test_split.class_names.index(label) for label in y_test_raw])
+    y_test = (
+        np.array(y_test_raw, dtype=np.int64)
+        if isinstance(y_test_raw[0], (int, np.integer))
+        else np.array([test_split.class_names.index(label) for label in y_test_raw])
+    )
 
     print(f"✓ Train: {x_train.shape}, Test: {x_test.shape}")
+    return x_train, y_train, x_test, y_test, train_split.class_names
 
-    # Analyze class distribution
-    print("\n[2/4] Analyse de la distribution...")
-    analyze_class_distribution(y_train, y_test, train_split.class_names)
 
-    # Diagnose training issues
-    print("\n[3/4] Diagnostic des données...")
-    diagnose_training_issues(x_train, y_train)
-
-    # Train simple model and analyze
-    print("\n[4/4] Entraînement d'un modèle de test...")
-
+def train_test_model(x_train: np.ndarray, y_train: np.ndarray) -> keras.Model:
+    """Entraine un modele CNN simple pour le diagnostic."""
     x_train_tmp, x_val_tmp, y_train_tmp, y_val_tmp = train_test_split(
         x_train, y_train, test_size=0.2, random_state=42
     )
 
-    # Modèle simple
     model = build_cnn_classifier(x_train.shape[1:], num_classes=4)
 
-    print("  ▶ Entraînement sur 5 epochs (rapide)...")
-    history = model.fit(
+    print("  ▶ Entrainement sur 5 epochs (rapide)...")
+    model.fit(
         x_train_tmp,
         y_train_tmp,
         validation_data=(x_val_tmp, y_val_tmp),
@@ -210,10 +204,11 @@ def main() -> None:
         verbose=0,
     )
 
-    # Analyze predictions
-    y_pred = analyze_model_predictions(model, x_test, y_test, train_split.class_names)
+    return model
 
-    # Recommendations
+
+def print_recommendations() -> None:
+    """Affiche les recommandations pour ameliorer l'accuracy."""
     print("\n" + "=" * 70)
     print("💡 RECOMMANDATIONS POUR AMÉLIORER L'ACCURACY")
     print("=" * 70)
@@ -229,7 +224,7 @@ def main() -> None:
             ],
         ),
         (
-            "Hyperparámétres",
+            "Hyperparamétres",
             [
                 "✓ Augmenter epochs: 10 → 50-100",
                 "✓ Réduire batch_size: 64 → 16-32",
@@ -267,6 +262,35 @@ def main() -> None:
     print("\n📌 Commande pour amélioration automatique:")
     print("   poetry run task boost")
     print("\n" + "=" * 70 + "\n")
+
+
+def main() -> None:
+    """Point d'entree principal pour l'analyse d'accuracy."""
+    print("\n" + "=" * 70)
+    print("🔧 ANALYSEUR D'ACCURACY - Diagnostic detaillé")
+    print("=" * 70)
+
+    # Charger les donnees
+    print("\n[1/4] Chargement des données...")
+    x_train, y_train, x_test, y_test, class_names = load_and_prepare_data()
+
+    # Analyze class distribution
+    print("\n[2/4] Analyse de la distribution...")
+    analyze_class_distribution(y_train, y_test, class_names)
+
+    # Diagnose training issues
+    print("\n[3/4] Diagnostic des données...")
+    diagnose_training_issues(x_train)
+
+    # Train simple model and analyze
+    print("\n[4/4] Entraînement d'un modèle de test...")
+    model = train_test_model(x_train, y_train)
+
+    # Analyze predictions
+    analyze_model_predictions(model, x_test, y_test, class_names)
+
+    # Recommendations
+    print_recommendations()
 
 
 if __name__ == "__main__":
