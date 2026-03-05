@@ -22,16 +22,37 @@ opencv-python = "^4.13.0.92"
 matplotlib = "^3.10.8"
 scikit-learn = "^1.8.0"
 pandas = "^3.0.1"
+flask = "^3.1.3"
 
 
 [tool.taskipy.tasks]
 # All commands starting with `poetry run task <task_name>`
+# ============== TRAINING & PHASES ==============
 dev = "python scripts/run_training.py"
 t1 = "python scripts/run_training.py"
 t2 = "python scripts/run_task2.py"
 t3 = "python scripts/run_task3.py"
 t4 = "python scripts/run_task4.py"
 t5 = "python scripts/run_task5.py"
+
+# ============== PHASES 5-7 (SAD SYSTEM) ==============
+dashboard = "python scripts/run_flask_dashboard.py"
+notebooks = "jupyter notebook notebooks/"
+nb-explore = "jupyter notebook notebooks/01_exploration_pretraitement.ipynb"
+nb-reglog = "jupyter notebook notebooks/02_reglog_calibration.ipynb"
+nb-mlp = "jupyter notebook notebooks/03_mlp_incertitude.ipynb"
+nb-cnn = "jupyter notebook notebooks/04_cnn_temperature_scaling.ipynb"
+nb-decision = "jupyter notebook notebooks/05_moteur_decision_clinique.ipynb"
+nb-reports = "jupyter notebook notebooks/06_tableau_bord_rapports.ipynb"
+nb-performance = "jupyter notebook notebooks/07_analyse_performance_sad.ipynb"
+
+# ============== TESTING ==============
+test = "python -m pytest tests/ -v"
+test-decision = "python -m pytest tests/test_decision_engine.py -v"
+test-reporting = "python -m pytest tests/test_reporting.py -v"
+test-evaluation = "python -m pytest tests/test_evaluation.py -v"
+
+# ============== CODE QUALITY ==============
 radon = "radon cc src -na -s --exclude hardware_components_models && radon mi src --ignore hardware_components_models"
 radon_raw = "radon raw src --ignore hardware_components_models"
 radon_hal = "radon hal src --ignore hardware_components_models"
@@ -42,6 +63,31 @@ poetry run task black && \
 poetry run task pylint
 """
 vulture = "vulture src"
+
+# ============== HELP ==============
+help = """
+echo '🎯 TÂCHES DISPONIBLES:\\n\\n' && \
+echo '📚 TRAINING & PHASES:' && \
+echo '  poetry run task dev       - Exécuter le training (t1)' && \
+echo '  poetry run task t1-t5    - Exécuter les phases 1-5' && \
+echo '\\n🏥 SYSTÈME SAD (Phases 5-7):' && \
+echo '  poetry run task dashboard  - Lancer le serveur Flask' && \
+echo '  poetry run task notebooks  - Ouvrir Jupyter avec tous les notebooks' && \
+echo '  poetry run task nb-decision   - Notebook Phase 5 (Decision Engine)' && \
+echo '  poetry run task nb-reports    - Notebook Phase 6 (Reports)' && \
+echo '  poetry run task nb-performance - Notebook Phase 7 (Performance)' && \
+echo '\\n✅ TESTS:' && \
+echo '  poetry run task test         - Exécuter tous les tests' && \
+echo '  poetry run task test-decision   - Tester le moteur de décision' && \
+echo '  poetry run task test-reporting - Tester la génération de rapports' && \
+echo '  poetry run task test-evaluation - Tester les métriques' && \
+echo '\\n🧹 CODE QUALITY:' && \
+echo '  poetry run task lint      - Black + Pylint' && \
+echo '  poetry run task black     - Formater le code' && \
+echo '  poetry run task pylint    - Vérifier le code' && \
+echo '  poetry run task radon     - Complexité du code' && \
+echo '\\n'
+"""
 
 [tool.black]
 line-length = 88
