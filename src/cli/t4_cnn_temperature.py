@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -110,7 +110,7 @@ def main() -> None:
         learning_rate=args.learning_rate,
     )
 
-    print("=== Tâche 4: CNN + Temperature Scaling ===")
+    print("--- Tâche 4: CNN + Temperature Scaling ---")
     print(
         f"Mode={'FAST' if args.fast else 'STANDARD'} | img_size={effective_img_size} | "
         f"epochs={effective_epochs} | batch_size={effective_batch_size} | ts_epochs={effective_ts_epochs}"

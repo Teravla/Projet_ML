@@ -18,7 +18,7 @@ import numpy as np
 from datetime import datetime
 
 # Ajouter le répertoire racine au path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.data.loader import load_dataset_split, discover_classes, DatasetSplit

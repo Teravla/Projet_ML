@@ -9,7 +9,7 @@ import sys
 import numpy as np
 from sklearn.metrics import accuracy_score
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -29,7 +29,7 @@ from src.models.log_reg import (
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Tâche 2 - Régression logistique multinomiale calibrée"
+        description="Task 2 - Calibrated Multinomial Logistic Regression"
     )
     parser.add_argument("--data-dir", type=str, default="data")
     parser.add_argument("--img-size", type=int, default=64)
@@ -91,7 +91,7 @@ def main() -> None:
     x_train_flat = flatten_images(x_train)
     x_test_flat = flatten_images(x_test)
 
-    print("=== Tâche 2: Régression Logistique + Calibration ===")
+    print("--- Tâche 2: Régression Logistique + Calibration ---")
     print(
         f"Mode={'FAST' if args.fast else 'STANDARD'} | "
         f"img_size={effective_img_size} | max_iter={effective_max_iter} | cv={effective_cv}"

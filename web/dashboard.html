@@ -5,403 +5,232 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAD - Système d'Aide à la Décision - Dashboard</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        .header {
-            background: white;
-            border-radius: 10px;
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header-content {}
-
-        .header h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        .header p {
-            color: #666;
-            font-size: 14px;
-        }
-
-        .header-controls {
-            display: flex;
-            gap: 10px;
-        }
-
-        .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #2ecc71;
-            margin-right: 8px;
-        }
-
-        .status-offline {
-            background: #e74c3c;
-        }
-
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            border-bottom: 2px solid #eee;
-        }
-
-        .nav-tab {
-            background: none;
-            border: none;
-            padding: 12px 20px;
-            cursor: pointer;
-            font-size: 14px;
-            color: #666;
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .nav-tab.active {
-            color: #667eea;
-            border-bottom-color: #667eea;
-            font-weight: 600;
-        }
-
-        .nav-tab:hover {
-            color: #667eea;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .card {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .card h2 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-
-        .card h3 {
-            color: #333;
-            margin-bottom: 12px;
-            font-size: 15px;
-            margin-top: 15px;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .metric-box {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border-left: 4px solid #667eea;
-        }
-
-        .metric-label {
-            font-size: 12px;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-        }
-
-        .metric-value {
-            font-size: 28px;
-            color: #667eea;
-            font-weight: bold;
-        }
-
-        .metric-subtext {
-            font-size: 11px;
-            color: #999;
-            margin-top: 5px;
-        }
-
-        .table-responsive {
-            overflow-x: auto;
-            margin-top: 20px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        th {
-            background: #f8f9fa;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            color: #333;
-            border-bottom: 2px solid #ddd;
-        }
-
-        td {
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-        }
-
-        tr:hover {
-            background: #f8f9fa;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .badge-urgente {
-            background: #fee;
-            color: #c33;
-        }
-
-        .badge-elevee {
-            background: #ffd;
-            color: #664;
-        }
-
-        .badge-normale {
-            background: #dff;
-            color: #0aa;
-        }
-
-        .badge-routine {
-            background: #eef;
-            color: #228;
-        }
-
-        .badge-haute {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .badge-moyenne {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .badge-faible {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .alert-box {
-            background: #e8f4f8;
-            border-left: 4px solid #0984e3;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-        }
-
-        .alert-box strong {
-            color: #0984e3;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            border-left-color: #28a745;
-        }
-
-        .alert-success strong {
-            color: #28a745;
-        }
-
-        .alert-danger {
-            background: #f8d7da;
-            border-left-color: #dc3545;
-        }
-
-        .alert-danger strong {
-            color: #dc3545;
-        }
-
-        .footer {
-            background: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 30px;
-            text-align: center;
-            color: #666;
-            font-size: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .error-message {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-        }
-
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                gap: 15px;
-            }
-
-            .header-controls {
-                width: 100%;
-            }
-
-            .btn {
-                flex: 1;
-            }
-
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .nav-tabs {
-                flex-wrap: wrap;
-            }
-        }
-
-        .distribution-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .dist-item {
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            text-align: center;
-        }
-
-        .dist-count {
-            font-size: 24px;
-            color: #667eea;
-            font-weight: bold;
-        }
-
-        .dist-label {
-            font-size: 12px;
-            color: #666;
-            margin-top: 8px;
-        }
-
-        .dist-percent {
-            font-size: 11px;
-            color: #999;
-            margin-top: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
     <div class="container">
         <div class="header">
             <div class="header-content">
-                <h1>🏥 Système d'Aide à la Décision (SAD)</h1>
-                <p>Diagnostic de Tumeurs Cérébrales | Dashboard Temps Réel</p>
+                <h1>Système d'Aide à la Décision (SAD)</h1>
+                <p>Diagnostic de Tumeurs Cérébrales</p>
                 <p><span class="status-indicator" id="status-indicator"></span><span
                         id="api-status">Vérification...</span></p>
             </div>
             <div class="header-controls">
-                <button class="btn" onclick="loadAllData()">🔄 Rafraîchir</button>
-                <button class="btn" onclick="exportData()">📥 Exporter JSON</button>
+                <button class="btn" onclick="loadAllData()">Rafraîchir</button>
+                <button class="btn" onclick="exportData()">Exporter JSON</button>
+            </div>
+        </div>
+
+        <!-- Page d'entraînement personnalisé (cachée par défaut) -->
+        <div id="training-page" style="display: none;">
+            <div
+                style="background: white; border-radius: 10px; padding: 40px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);">
+                <div style="margin-bottom: 40px;">
+                    <h1 style="color: #b71c1c; margin-bottom: 10px; font-size: 32px;">Configuration d'Entraînement</h1>
+                    <p style="color: #666; font-size: 16px;">Personnalisez votre modèle d'IA pour le diagnostic de
+                        tumeurs cérébrales</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 40px;">
+                    <!-- Gauche: Configuration -->
+                    <div>
+                        <h2 style="color: #333; margin-bottom: 25px; font-size: 18px;">Paramètres</h2>
+
+                        <!-- Taille Image -->
+                        <div style="margin-bottom: 30px;">
+                            <label style="display: block; font-weight: 600; color: #333; margin-bottom: 10px;">
+                                Résolution Image
+                            </label>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="img-size-btn active" onclick="setImageSize(64)">64x64</button>
+                                <button class="img-size-btn" onclick="setImageSize(128)">128x128</button>
+                                <button class="img-size-btn" onclick="setImageSize(224)">224x224</button>
+                            </div>
+                            <p style="font-size: 12px; color: #999; margin-top: 8px;">Plus grande = meilleure précision
+                                mais plus lent</p>
+                        </div>
+
+                        <!-- Sélection Algos -->
+                        <div style="margin-bottom: 30px;">
+                            <label
+                                style="display: block; font-weight: 600; color: #333; margin-bottom: 10px;">Algorithmes</label>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="algo-cnn" checked onchange="updateCommand()">
+                                    <span>CNN</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="algo-transfer" checked onchange="updateCommand()">
+                                    <span>Transfer Learning</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="algo-mlp" onchange="updateCommand()">
+                                    <span>MLP</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Options CNN -->
+                        <div id="cnn-options"
+                            style="margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+                            <h3 style="color: #333; font-size: 14px; margin-bottom: 15px; font-weight: 600;">Options CNN
+                            </h3>
+
+                            <!-- Sweep -->
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 15px;">
+                                <input type="checkbox" id="use-sweep" onchange="updateCommand(); toggleSweepOptions()">
+                                <span style="font-weight: 600;">Hyperparameter Sweep</span>
+                            </label>
+
+                            <!-- Sweep Options (hidden by default) -->
+                            <div id="sweep-options"
+                                style="display: none; margin-bottom: 15px; padding: 10px; background: white; border-radius: 4px;">
+                                <div style="margin-bottom: 12px;">
+                                    <label
+                                        style="display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 5px;">
+                                        Nombre de configurations à tester: <span id="sweep-trials-value">4</span>
+                                    </label>
+                                    <input type="range" id="sweep-trials" min="1" max="20" value="4"
+                                        onchange="document.getElementById('sweep-trials-value').textContent = this.value; updateCommand();"
+                                        style="width: 100%;">
+                                </div>
+                                <div>
+                                    <label
+                                        style="display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 5px;">
+                                        Epochs par essai: <span id="sweep-epochs-value">12</span>
+                                    </label>
+                                    <input type="range" id="sweep-epochs" min="1" max="50" value="12"
+                                        onchange="document.getElementById('sweep-epochs-value').textContent = this.value; updateCommand();"
+                                        style="width: 100%;">
+                                </div>
+                            </div>
+
+                            <!-- Final Train -->
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 15px;">
+                                <input type="checkbox" id="use-final-train"
+                                    onchange="updateCommand(); toggleFinalTrainOptions()">
+                                <span style="font-weight: 600;">Réentraînement Final</span>
+                            </label>
+
+                            <!-- Final Train Options -->
+                            <div id="final-train-options"
+                                style="display: none; padding: 10px; background: white; border-radius: 4px;">
+                                <label
+                                    style="display: block; font-size: 12px; font-weight: 600; color: #666; margin-bottom: 5px;">
+                                    Epochs final: <span id="final-epochs-value">40</span>
+                                </label>
+                                <input type="range" id="final-epochs" min="10" max="200" value="40"
+                                    onchange="document.getElementById('final-epochs-value').textContent = this.value; updateCommand();"
+                                    style="width: 100%;">
+                            </div>
+
+                            <!-- TTA -->
+                            <label
+                                style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 15px;">
+                                <input type="checkbox" id="use-tta" checked onchange="updateCommand()">
+                                <span style="font-weight: 600;">Test-Time Augmentation</span>
+                                <span style="font-size: 11px; color: #999;">(+10% accuracy, +30% temps)</span>
+                            </label>
+
+                            <!-- Focal Loss -->
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="use-focal" onchange="updateCommand()">
+                                <span style="font-weight: 600;">Focal Loss</span>
+                                <span style="font-size: 11px; color: #999;">(meilleur pour classes
+                                    déséquilibrées)</span>
+                            </label>
+                        </div>
+
+                        <!-- Epochs CNN standard (si pas de sweep) -->
+                        <div id="epochs-standard" style="margin-bottom: 30px;">
+                            <label style="display: block; font-weight: 600; color: #333; margin-bottom: 10px;">
+                                Epochs CNN: <span id="epochs-value">100</span>
+                            </label>
+                            <input type="range" id="epochs-slider" min="10" max="200" value="100"
+                                onchange="document.getElementById('epochs-value').textContent = this.value; updateCommand();"
+                                style="width: 100%;">
+                            <p style="font-size: 12px; color: #999; margin-top: 8px;">Plus d'epochs = meilleur
+                                apprentissage mais plus lent</p>
+                        </div>
+                    </div>
+
+                    <!-- Droite: Aperçu & Commande -->
+                    <div>
+                        <h2 style="color: #333; margin-bottom: 25px; font-size: 18px;">Aperçu</h2>
+
+                        <!-- Estimation Temps -->
+                        <div
+                            style="background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%); color: white; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                            <div style="font-size: 12px; opacity: 0.9; margin-bottom: 5px;">ESTIMATION</div>
+                            <div style="font-size: 32px; font-weight: 700;" id="time-estimate">~2 heures</div>
+                            <div style="font-size: 12px; opacity: 0.9; margin-top: 10px;" id="time-breakdown">CNN seul:
+                                2h</div>
+                        </div>
+
+                        <!-- Résumé Configuration -->
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+                            <h3 style="color: #333; font-size: 14px; margin-bottom: 15px; font-weight: 600;">
+                                Configuration</h3>
+                            <div id="config-summary" style="font-size: 13px; color: #666; line-height: 1.8;">
+                                <div>Image: <strong>64x64</strong></div>
+                                <div>Algos: <strong>CNN + Transfer</strong></div>
+                                <div>Options: <strong>TTA activé</strong></div>
+                            </div>
+                        </div>
+
+                        <!-- Commande -->
+                        <div style="margin-bottom: 20px;">
+                            <label style="display: block; font-weight: 600; color: #333; margin-bottom: 10px;">Commande
+                                à exécuter:</label>
+                            <div style="background: #1e1e1e; color: #00d26a; padding: 15px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 11px; overflow-x: auto; line-height: 1.6; word-break: break-all; margin-bottom: 10px;"
+                                id="command-display">
+                                poetry run task base64 --cnn --transfer --img-size 64 --tta --epochs 100
+                            </div>
+                            <button class="btn" onclick="copyCommand()" style="width: 100%; background: #2ecc71;">
+                                Copier la commande
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Boutons d'action -->
+                <div
+                    style="display: flex; gap: 15px; justify-content: center; border-top: 1px solid #eee; padding-top: 30px;">
+                    <button class="btn" onclick="hideTrainingPage()" style="background: #ccc; color: #333;">
+                        Annuler
+                    </button>
+                    <button class="btn" onclick="executeTraining()"
+                        style="background: #2ecc71; font-size: 16px; padding: 12px 40px;">
+                        Lancer l'entraînement
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerte si aucun modèle n'est chargé -->
+        <div id="model-alert" class="alert-box" style="display: none; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <strong>Aucun modèle trouvé</strong>
+                    <p style="margin-top: 8px; color: #666;">Les données affichées sont simulées. Créez un modèle pour
+                        utiliser des prédictions réelles.</p>
+                </div>
+                <button class="btn" id="train-btn" onclick="showTrainingPage()" style="background: #b71c1c;">
+                    Configurer l'entraînement
+                </button>
             </div>
         </div>
 
         <div class="card">
             <div class="nav-tabs">
-                <button class="nav-tab active" onclick="switchTab(event, 'stats')">📊 Statistiques</button>
-                <button class="nav-tab" onclick="switchTab(event, 'decisions')">🩺 Décisions Patients</button>
-                <button class="nav-tab" onclick="switchTab(event, 'metrics')">📈 Métriques Performance</button>
-                <button class="nav-tab" onclick="switchTab(event, 'pipeline')">🔄 Pipeline SAD</button>
+                <button class="nav-tab active" onclick="switchTab(event, 'stats')">Statistiques</button>
+                <button class="nav-tab" onclick="switchTab(event, 'decisions')">Décisions Patients</button>
+                <button class="nav-tab" onclick="switchTab(event, 'metrics')">Performance</button>
+                <button class="nav-tab" onclick="switchTab(event, 'pipeline')">Pipeline SAD</button>
             </div>
 
             <!-- TAB: Statistiques -->
@@ -422,7 +251,7 @@
 
             <!-- TAB: Métriques Performance -->
             <div id="metrics" class="tab-content">
-                <h2 style="margin-top: 20px;">Analyse de Performance (Phase 7)</h2>
+                <h2 style="margin-top: 20px;">Analyse de Performance</h2>
                 <div id="metrics-content" class="loading">
                     <div class="spinner"></div> Chargement...
                 </div>
@@ -446,324 +275,58 @@
                     </ol>
                 </div>
 
-                <h3>📋 Flux de Traitement Détaillé</h3>
+                <h3>Flux de Traitement Détaillé</h3>
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 6px; margin-top: 15px;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">📸</div>
-                            <strong>IRM Input</strong>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">IRM
+                            </div>
+                            <strong>Entrée</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">Image patient</p>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">🧠</div>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">AI</div>
                             <strong>Modèles IA</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">CNN, Calibration</p>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">🎯</div>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">%</div>
                             <strong>Probabilités</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">4 classes</p>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">⚖️</div>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">⚖</div>
                             <strong>Moteur SAD</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">Règles + Triage</p>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">📄</div>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">📄</div>
                             <strong>Rapport</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">Pour médecin</p>
                         </div>
-                        <div style="text-align: center; padding: 15px; background: white; border-radius: 6px;">
-                            <div style="font-size: 24px; margin-bottom: 8px;">💾</div>
+                        <div
+                            style="text-align: center; padding: 15px; background: white; border-radius: 6px; border-top: 3px solid #b71c1c;">
+                            <div style="font-size: 16px; margin-bottom: 8px; font-weight: 700; color: #b71c1c;">LOG
+                            </div>
                             <strong>Audit Trail</strong>
                             <p style="font-size: 12px; color: #666; margin-top: 5px;">Traçabilité</p>
                         </div>
                     </div>
                 </div>
-
-                <h3 style="margin-top: 25px;">Règles Clés du SAD</h3>
-                <div class="alert-box">
-                    <strong>🚨 Règle de Sécurité (Notumor):</strong><br>
-                    Si diagnostic = "Pas de tumeur" ET confiance < 95% → ALERTE et révision humaine requise </div>
-                        <div class="alert-success">
-                            <strong>✅ Objectif Haute Confiance:</strong><br>
-                            Atteindre >95% d'accuracy pour les prédictions avec confiance > 85% (HAUTE)
-                        </div>
-                </div>
             </div>
 
             <div class="footer">
-                <p>🏥 SAD - Système d'Aide à la Décision | Diagnostic de Tumeurs Cérébrales | Dashboard v2.0 (API)</p>
-                <p>Projet ML - EFREI | Phases 5-7 du Cahier des Charges | Connecté à l'API Flask</p>
+                <p>Dashboard v2.0</p>
+                <p>Projet ML - EFREI</p>
             </div>
         </div>
 
-        <script>
-            const API_BASE = 'http://localhost:5000/api';
-
-            // Vérifier la connexion à l'API au chargement
-            window.addEventListener('load', async () => {
-                await checkApiHealth();
-                await loadAllData();
-            });
-
-            async function checkApiHealth() {
-                try {
-                    const response = await fetch(`${API_BASE}/health`, {
-                        headers: { 'Accept': 'application/json' }
-                    });
-                    if (response.ok) {
-                        document.getElementById('api-status').textContent = '🟢 API Connectée';
-                        document.getElementById('status-indicator').classList.remove('status-offline');
-                    } else {
-                        setApiError();
-                    }
-                } catch (error) {
-                    setApiError();
-                }
-            }
-
-            function setApiError() {
-                document.getElementById('api-status').textContent = '🔴 API Indisponible - Assurez-vous que le serveur Flask est lancé';
-                document.getElementById('status-indicator').classList.add('status-offline');
-            }
-
-            async function loadAllData() {
-                await loadStats();
-                await loadDecisions();
-                await loadMetrics();
-            }
-
-            async function loadStats() {
-                const container = document.getElementById('stats-content');
-                try {
-                    const response = await fetch(`${API_BASE}/stats`);
-                    const data = await response.json();
-
-                    let html = `
-                    <div class="metrics-grid">
-                        <div class="metric-box">
-                            <div class="metric-label">Total Patients</div>
-                            <div class="metric-value">${data.n_total}</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Couverture Automatique</div>
-                            <div class="metric-value">${data.couverture_automatique}%</div>
-                            <div class="metric-subtext">${data.n_total - data.revisions} cas auto</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Alertes Sécurité</div>
-                            <div class="metric-value" style="color: #e74c3c;">${data.alertes}</div>
-                            <div class="metric-subtext">Révisions notumor</div>
-                        </div>
-                    </div>
-
-                    <h3>Distribution par Confiance</h3>
-                    <div class="distribution-grid">
-                `;
-
-                    for (const [level, info] of Object.entries(data.confiance_distribution)) {
-                        const badge = `badge-${level.toLowerCase()}`;
-                        html += `
-                        <div class="dist-item">
-                            <span class="badge ${badge}">${level}</span>
-                            <div class="dist-count">${info.count}</div>
-                            <div class="dist-percent">${info.percent}%</div>
-                        </div>
-                    `;
-                    }
-
-                    html += `</div><h3>Distribution par Priorité Triage</h3><div class="distribution-grid">`;
-
-                    for (const [level, info] of Object.entries(data.priorite_distribution)) {
-                        const badgeMap = {
-                            'URGENTE': 'urgente',
-                            'ELEVEE': 'elevee',
-                            'NORMALE': 'normale',
-                            'ROUTINE': 'routine'
-                        };
-                        const badge = `badge-${badgeMap[level] || 'routine'}`;
-                        html += `
-                        <div class="dist-item">
-                            <span class="badge ${badge}">${level}</span>
-                            <div class="dist-count">${info.count}</div>
-                            <div class="dist-percent">${info.percent}%</div>
-                        </div>
-                    `;
-                    }
-
-                    html += `</div>`;
-                    container.innerHTML = html;
-                } catch (error) {
-                    container.innerHTML = `<div class="error-message">Erreur lors du chargement des statistiques: ${error.message}</div>`;
-                }
-            }
-
-            async function loadDecisions() {
-                const container = document.getElementById('decisions-content');
-                try {
-                    const response = await fetch(`${API_BASE}/decisions`);
-                    const data = await response.json();
-
-                    let html = `
-                    <div class="alert-box">
-                        Affichage: <strong>${data.decisions.length}</strong> décisions sur <strong>${data.total}</strong> total
-                    </div>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Patient</th>
-                                    <th>Diagnostic</th>
-                                    <th>Confiance</th>
-                                    <th>Niveau</th>
-                                    <th>Priorité</th>
-                                    <th>Alerte</th>
-                                    <th>Décision</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                `;
-
-                    for (const d of data.decisions) {
-                        const badgeLevel = `badge-${d.niveau_confiance.toLowerCase()}`;
-                        const badgePrio = d.priorite.includes('URGENTE') ? 'urgente' :
-                            d.priorite.includes('Élevée') ? 'elevee' :
-                                d.priorite.includes('Normale') ? 'normale' : 'routine';
-                        const alerte = d.alerte_securite ? '🚨 OUI' : 'Non';
-
-                        html += `
-                        <tr>
-                            <td><strong>${d.patient_id}</strong></td>
-                            <td>${d.classe_predite}</td>
-                            <td>${(d.confiance * 100).toFixed(1)}%</td>
-                            <td><span class="badge ${badgeLevel}">${d.niveau_confiance}</span></td>
-                            <td><span class="badge badge-${badgePrio}">${d.priorite}</span></td>
-                            <td>${alerte}</td>
-                            <td style="font-size: 11px;">${d.decision}</td>
-                        </tr>
-                    `;
-                    }
-
-                    html += `
-                            </tbody>
-                        </table>
-                    </div>
-                `;
-                    container.innerHTML = html;
-                } catch (error) {
-                    container.innerHTML = `<div class="error-message">Erreur: ${error.message}</div>`;
-                }
-            }
-
-            async function loadMetrics() {
-                const container = document.getElementById('metrics-content');
-                try {
-                    const response = await fetch(`${API_BASE}/metrics`);
-                    const metrics = await response.json();
-
-                    const objAtteint = metrics.objectif_haute_confiance.objectif_atteint ?
-                        '<span style="color: #28a745;">✅ OUI</span>' :
-                        '<span style="color: #e74c3c;">❌ NON</span>';
-
-                    let html = `
-                    <div class="metrics-grid">
-                        <div class="metric-box">
-                            <div class="metric-label">Accuracy Globale</div>
-                            <div class="metric-value">${(metrics.accuracy_globale * 100).toFixed(2)}%</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Couverture Automatique</div>
-                            <div class="metric-value">${(metrics.taux_couverture_automatique * 100).toFixed(1)}%</div>
-                        </div>
-                        <div class="metric-box">
-                            <div class="metric-label">Objectif Haute Confiance</div>
-                            <div class="metric-value" style="font-size: 18px;">${objAtteint}</div>
-                            <div class="metric-subtext">N=${metrics.objectif_haute_confiance.n_cas}, Accuracy=${metrics.objectif_haute_confiance.accuracy ? (metrics.objectif_haute_confiance.accuracy * 100).toFixed(2) + '%' : 'N/A'}</div>
-                        </div>
-                    </div>
-
-                    <h3>Analyse des Coûts (Phase 7)</h3>
-                    <div class="metrics-grid">
-                        <div class="metric-box" style="border-left-color: #e74c3c;">
-                            <div class="metric-label">Faux Négatifs (FN)</div>
-                            <div class="metric-value">${metrics.couts.FN}</div>
-                            <div class="metric-subtext">Coût: ${metrics.couts.FN} × 1000€ = ${(metrics.couts.FN * 1000).toLocaleString()}€</div>
-                        </div>
-                        <div class="metric-box" style="border-left-color: #fdcb6e;">
-                            <div class="metric-label">Faux Positifs (FP)</div>
-                            <div class="metric-value">${metrics.couts.FP}</div>
-                            <div class="metric-subtext">Coût: ${metrics.couts.FP} × 100€ = ${(metrics.couts.FP * 100).toLocaleString()}€</div>
-                        </div>
-                        <div class="metric-box" style="border-left-color: #0984e3;">
-                            <div class="metric-label">Révisions Humaines</div>
-                            <div class="metric-value">${metrics.couts.Revision}</div>
-                            <div class="metric-subtext">Coût: ${metrics.couts.Revision} × 50€ = ${(metrics.couts.Revision * 50).toLocaleString()}€</div>
-                        </div>
-                        <div class="metric-box" style="border-left-color: #667eea; background: linear-gradient(135deg, rgba(102,126,234,0.1) 0%, rgba(118,75,162,0.1) 100%);">
-                            <div class="metric-label">Coût Total SAD</div>
-                            <div class="metric-value">${(metrics.couts.Cost_total).toLocaleString()}€</div>
-                            <div class="metric-subtext">Pour ensemble patients</div>
-                        </div>
-                    </div>
-
-                    <div class="alert-success" style="margin-top: 20px;">
-                        <strong>💰 Interprétation Économique:</strong><br>
-                        Formule: Cost = (FN × 1000€) + (FP × 100€) + (Revision × 50€)<br>
-                        Le SAD permet de traiter ${(metrics.taux_couverture_automatique * 100).toFixed(1)}% des cas automatiquement tout en maintenant une accuracy de ${metrics.objectif_haute_confiance.accuracy ? (metrics.objectif_haute_confiance.accuracy * 100).toFixed(2) : '?'}% pour les cas de haute confiance. Les ${((1 - metrics.taux_couverture_automatique) * 100).toFixed(1)}% restants subissent une révision humaine pour minimiser les faux négatifs graves.
-                    </div>
-                `;
-                    container.innerHTML = html;
-                } catch (error) {
-                    container.innerHTML = `<div class="error-message">Erreur: ${error.message}</div>`;
-                }
-            }
-
-            function switchTab(event, tabName) {
-                // Masquer tous les onglets
-                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-
-                // Retirer active des boutons
-                document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-
-                // Afficher l'onglet sélectionné
-                document.getElementById(tabName).classList.add('active');
-                event.target.classList.add('active');
-            }
-
-            async function exportData() {
-                try {
-                    const statsRes = await fetch(`${API_BASE}/stats`);
-                    const decisionsRes = await fetch(`${API_BASE}/decisions`);
-                    const metricsRes = await fetch(`${API_BASE}/metrics`);
-
-                    const stats = await statsRes.json();
-                    const decisions = await decisionsRes.json();
-                    const metrics = await metricsRes.json();
-
-                    const exportData = {
-                        timestamp: new Date().toISOString(),
-                        stats,
-                        decisions,
-                        metrics
-                    };
-
-                    const json = JSON.stringify(exportData, null, 2);
-                    const blob = new Blob([json], {
-                        type: 'application/json'
-                    });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `sad-export-${new Date().toISOString().split('T')[0]}.json`;
-                    a.click();
-                    URL.revokeObjectURL(url);
-                } catch (error) {
-                    alert('Erreur lors de l\'export: ' + error.message);
-                }
-            }
-        </script>
+        <script src="script.js"></script>
 </body>
 
 </html>

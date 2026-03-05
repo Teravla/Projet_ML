@@ -10,7 +10,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -27,7 +27,7 @@ from src.models.uncertainty import mc_dropout_predict, summarize_uncertainty
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Tâche 3 - MLP probabiliste avec gestion de l'incertitude"
+        description="Task 3 - Probabilistic MLP with Uncertainty Management"
     )
     parser.add_argument("--data-dir", type=str, default="data")
     parser.add_argument("--img-size", type=int, default=64)
@@ -107,7 +107,7 @@ def main() -> None:
         learning_rate=args.learning_rate,
     )
 
-    print("=== Tâche 3: MLP + Gestion de l'incertitude ===")
+    print("--- Tâche 3: MLP + Gestion de l'incertitude ---")
     print(
         f"Mode={'FAST' if args.fast else 'STANDARD'} | "
         f"img_size={effective_img_size} | epochs={effective_epochs} | "

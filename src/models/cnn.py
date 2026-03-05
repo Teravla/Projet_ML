@@ -99,10 +99,74 @@ def predict_logits(
 def predict_probabilities(
     model: tf.keras.Model, x_data: np.ndarray, batch_size: int = 256
 ) -> np.ndarray:
-    """Retourne les probabilités softmax."""
+    """Retourne les probabilités prédites via softmax."""
 
-    logits = predict_logits(model, x_data, batch_size=batch_size)
-    return tf.nn.softmax(logits, axis=1).numpy().astype(np.float32)
+    logits = predict_logits(model, x_data, batch_size)
+    return tf.nn.softmax(logits, axis=1).numpy()
+
+
+def build_cnn_optimized(
+    input_shape: tuple[int, int, int],
+    num_classes: int,
+    dropout_rate: float = 0.3,
+    learning_rate: float = 3e-4,
+    l2_reg: float = 3e-5,
+) -> tf.keras.Model:
+    """CNN optimisé stable pour limiter l'overfit et les écarts train/val."""
+
+    regularizer = tf.keras.regularizers.l2(l2_reg)
+    inputs = tf.keras.Input(shape=input_shape, name="image")
+
+    # Bloc 1
+    x = tf.keras.layers.Conv2D(
+        32, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(inputs)
+    x = tf.keras.layers.Conv2D(
+        32, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = tf.keras.layers.Dropout(dropout_rate * 0.5)(x)
+
+    # Bloc 2
+    x = tf.keras.layers.Conv2D(
+        64, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(x)
+    x = tf.keras.layers.Conv2D(
+        64, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = tf.keras.layers.Dropout(dropout_rate * 0.8)(x)
+
+    # Bloc 3
+    x = tf.keras.layers.Conv2D(
+        128, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(x)
+    x = tf.keras.layers.Conv2D(
+        128, 3, padding="same", activation="relu", kernel_regularizer=regularizer
+    )(x)
+    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = tf.keras.layers.Dropout(dropout_rate)(x)
+
+    # Global Average Pooling (meilleur que Flatten pour réduire overfitting)
+    x = tf.keras.layers.GlobalAveragePooling2D()(x)
+    x = tf.keras.layers.Dropout(dropout_rate * 1.2)(x)
+
+    # Dense finale
+    x = tf.keras.layers.Dense(256, activation="relu", kernel_regularizer=regularizer)(x)
+    x = tf.keras.layers.Dropout(dropout_rate * 1.5)(x)
+
+    logits = tf.keras.layers.Dense(num_classes, name="logits")(x)
+
+    model = tf.keras.Model(inputs=inputs, outputs=logits, name="cnn_optimized")
+
+    # Optimizer avec gradient clipping pour stabilité
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
+    model.compile(
+        optimizer=optimizer,
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        metrics=["accuracy"],
+    )
+    return model
 
 
 def extract_intermediate_activations(
