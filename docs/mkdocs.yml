@@ -1,0 +1,37 @@
+site_name: Project ML Documentation
+site_description: Documentation for the Project ML
+site_author: MENON Valentin
+copyright: "2025 MENON Valentin"
+site_url: http://localhost:8974
+repo_url: https://github.com/Teravla/Projet_ML
+repo_name: Project ML GitHub
+docs_dir: docs
+dev_addr: localhost:8974
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.top
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - ../src
+          options:
+            show_root_heading: false
+            show_signature_annotations: true
+            show_source: true
+            docstring_style: sphinx
+          inventories:
+            - https://docs.python.org/3/objects.inv
+  - gen-files:
+      scripts:
+        - gen_api_docs.py
+  - awesome-pages
+  - literate-nav
