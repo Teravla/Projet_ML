@@ -1,6 +1,6 @@
 """Metriques de performance classiques et metier."""
 
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -38,10 +38,7 @@ def accuracy_par_tranche_confiance(
     for left, right in zip(bins[:-1], bins[1:]):
         mask = (conf_arr >= left) & (conf_arr < right)
         n = int(mask.sum())
-        if n == 0:
-            acc = np.nan
-        else:
-            acc = float((y_true_arr[mask] == y_pred_arr[mask]).mean())
+        acc = np.nan if n == 0 else float((y_true_arr[mask] == y_pred_arr[mask]).mean())
 
         rows.append(
             {

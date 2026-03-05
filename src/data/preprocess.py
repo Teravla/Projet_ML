@@ -2,8 +2,23 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import cv2
 import numpy as np
+
+
+@dataclass(frozen=True)
+class LabelEncodingConfig:
+    """Configuration d'encodage des labels."""
+
+    one_hot: bool = False
+    num_classes: int | None = None
+
+
+# OpenCV est une extension C, pylint peut ne pas résoudre ses membres statiquement.
+_CV_RESIZE = getattr(cv2, "resize")
+_CV_INTER_AREA = getattr(cv2, "INTER_AREA")
 
 
 def resize_images(
@@ -13,7 +28,7 @@ def resize_images(
 
     width, height = target_size
     resized = [
-        cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+        _CV_RESIZE(image, (width, height), interpolation=_CV_INTER_AREA)
         for image in images
     ]
     return np.asarray(resized, dtype=np.float32)
@@ -36,19 +51,31 @@ def preprocess_dataset(
     labels: np.ndarray,
     target_size: tuple[int, int] = (224, 224),
     normalize: bool = True,
-    one_hot: bool = False,
-    num_classes: int | None = None,
+    label_config: LabelEncodingConfig | None = None,
+    **kwargs,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Pipeline complet de prétraitement pour un split."""
+
+    # Backward compatibility: support legacy kwargs one_hot / num_classes.
+    if label_config is None:
+        label_config = LabelEncodingConfig(
+            one_hot=bool(kwargs.pop("one_hot", False)),
+            num_classes=kwargs.pop("num_classes", None),
+        )
+    if kwargs:
+        unknown = ", ".join(sorted(kwargs.keys()))
+        raise TypeError(f"Unexpected keyword arguments: {unknown}")
 
     processed_images = resize_images(images, target_size=target_size)
     if normalize:
         processed_images = normalize_images(processed_images)
 
     processed_labels = labels
-    if one_hot:
+    if label_config.one_hot:
         effective_num_classes = int(
-            num_classes if num_classes is not None else np.max(labels) + 1
+            label_config.num_classes
+            if label_config.num_classes is not None
+            else np.max(labels) + 1
         )
         processed_labels = one_hot_encode(labels, effective_num_classes)
 

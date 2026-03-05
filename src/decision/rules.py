@@ -10,6 +10,8 @@ from src.config.thresholds import SEUIL_SECURITE_NEGATIF
 
 
 NOTUMOR_ALIASES = {"notumor", "pasdetumeur", "sanstumeur", "saintumeur"}
+MIN_PROBABILITIES_FOR_AMBIGUITY = 2
+CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
 
 
 def appliquer_regle_securite_negatif(
@@ -86,7 +88,7 @@ def detecter_cas_ambigus(decision: ClinicalDecision, seuil_ecart: float = 0.15) 
     # Trier les probabilités par ordre décroissant
     probs_sorted = sorted(decision.probabilites.values(), reverse=True)
 
-    if len(probs_sorted) < 2:
+    if len(probs_sorted) < MIN_PROBABILITIES_FOR_AMBIGUITY:
         return False
 
     ecart = probs_sorted[0] - probs_sorted[1]
@@ -119,7 +121,7 @@ def identifier_cas_limites(
             continue
 
         # Cas 2: Confiance très faible
-        if decision.niveau_confiance == "TRES_FAIBLE":
+        if decision.niveau_confiance == CONFIDENCE_TRES_FAIBLE:
             cas_limites.append(decision)
             continue
 

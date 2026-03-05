@@ -3,10 +3,23 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 from src.data.augment import augment_batch, create_training_augmenter
 from src.data.loader import load_dataset_split, summarize_split
 from src.data.preprocess import preprocess_dataset
+
+
+@dataclass(frozen=True)
+class PreprocessResult:
+    """Contient les sorties utiles du preprocessing."""
+
+    train_images_shape: tuple[int, ...]
+    train_labels_shape: tuple[int, ...]
+    test_images_shape: tuple[int, ...]
+    test_labels_shape: tuple[int, ...]
+    augmented_shape: tuple[int, ...]
+    class_names: list[str]
 
 
 def parse_args() -> argparse.Namespace:
@@ -37,24 +50,21 @@ def print_split_summary(split_name: str, summary: dict[str, int]) -> None:
         print(f"- {class_name:<12}: {count}")
 
 
-def main() -> None:
-    """Point d'entrée principal pour la tâche 1."""
-    args = parse_args()
-    data_dir = Path(args.data_dir)
+def preprocess_and_augment(
+    data_dir: Path, img_size: int, normalize: bool
+) -> PreprocessResult:
+    """Charge, preprocess et augmente un batch d'images."""
     train_dir = data_dir / "Training"
     test_dir = data_dir / "Testing"
-
     if not train_dir.exists() or not test_dir.exists():
         raise FileNotFoundError(
             f"Directories not found. Expected: {train_dir} et {test_dir}"
         )
 
-    train_summary = summarize_split(train_dir)
-    test_summary = summarize_split(test_dir)
-    print_split_summary("Training", train_summary)
-    print_split_summary("Testing", test_summary)
+    print_split_summary("Training", summarize_split(train_dir))
+    print_split_summary("Testing", summarize_split(test_dir))
 
-    image_size = (args.img_size, args.img_size)
+    image_size = (img_size, img_size)
     train_split = load_dataset_split(train_dir, image_size=image_size)
     test_split = load_dataset_split(
         test_dir, image_size=image_size, class_names=train_split.class_names
@@ -64,28 +74,48 @@ def main() -> None:
         train_split.images,
         train_split.labels,
         target_size=image_size,
-        normalize=not args.no_normalize,
+        normalize=normalize,
         one_hot=False,
     )
     test_images, test_labels = preprocess_dataset(
         test_split.images,
         test_split.labels,
         target_size=image_size,
-        normalize=not args.no_normalize,
+        normalize=normalize,
         one_hot=False,
     )
 
     augmenter = create_training_augmenter(seed=42)
-    sample_size = min(8, len(train_images))
-    augmented_sample = augment_batch(train_images[:sample_size], augmenter)
+    augmented_sample = augment_batch(
+        train_images[: min(8, len(train_images))], augmenter
+    )
+
+    return PreprocessResult(
+        train_images_shape=train_images.shape,
+        train_labels_shape=train_labels.shape,
+        test_images_shape=test_images.shape,
+        test_labels_shape=test_labels.shape,
+        augmented_shape=augmented_sample.shape,
+        class_names=train_split.class_names,
+    )
+
+
+def main() -> None:
+    """Point d'entrée principal pour la tâche 1."""
+    args = parse_args()
+    result = preprocess_and_augment(
+        data_dir=Path(args.data_dir),
+        img_size=args.img_size,
+        normalize=not args.no_normalize,
+    )
 
     print("\nPrétraitement terminé")
-    print(f"- Train images shape: {train_images.shape}")
-    print(f"- Train labels shape: {train_labels.shape}")
-    print(f"- Test images shape : {test_images.shape}")
-    print(f"- Test labels shape : {test_labels.shape}")
-    print(f"- Batch augmenté   : {augmented_sample.shape}")
-    print(f"- Classes          : {train_split.class_names}")
+    print(f"- Train images shape: {result.train_images_shape}")
+    print(f"- Train labels shape: {result.train_labels_shape}")
+    print(f"- Test images shape : {result.test_images_shape}")
+    print(f"- Test labels shape : {result.test_labels_shape}")
+    print(f"- Batch augmenté   : {result.augmented_shape}")
+    print(f"- Classes          : {result.class_names}")
 
 
 if __name__ == "__main__":

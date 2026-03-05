@@ -1,6 +1,6 @@
 """Calcul du cout clinique (FN/FP/Revision)."""
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from src.config.thresholds import CostParameters
 

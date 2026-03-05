@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import cv2
 import numpy as np
@@ -12,6 +12,14 @@ import numpy as np
 
 DEFAULT_CLASS_NAMES = ["glioma", "meningioma", "pituitary", "notumor"]
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
+
+# OpenCV est une extension C, pylint peut ne pas résoudre ses membres statiquement.
+_CV_IMREAD = getattr(cv2, "imread")
+_CV_IMREAD_COLOR = getattr(cv2, "IMREAD_COLOR")
+_CV_CVT_COLOR = getattr(cv2, "cvtColor")
+_CV_COLOR_BGR2RGB = getattr(cv2, "COLOR_BGR2RGB")
+_CV_RESIZE = getattr(cv2, "resize")
+_CV_INTER_AREA = getattr(cv2, "INTER_AREA")
 
 
 @dataclass(frozen=True)
@@ -65,13 +73,13 @@ def load_image(
     """Charge une image depuis le disque et la redimensionne."""
 
     path = Path(image_path)
-    image = cv2.imread(str(path), cv2.IMREAD_COLOR)
+    image = _CV_IMREAD(str(path), _CV_IMREAD_COLOR)
     if image is None:
         raise ValueError(f"Image illisible: {path}")
     if rgb:
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image = _CV_CVT_COLOR(image, _CV_COLOR_BGR2RGB)
     width, height = image_size
-    image = cv2.resize(image, (width, height), interpolation=cv2.INTER_AREA)
+    image = _CV_RESIZE(image, (width, height), interpolation=_CV_INTER_AREA)
     return image.astype(np.float32)
 
 

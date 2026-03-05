@@ -13,6 +13,23 @@ from src.config.thresholds import (
 )
 
 
+CONFIDENCE_HAUTE = "HAUTE"
+CONFIDENCE_MOYENNE = "MOYENNE"
+CONFIDENCE_FAIBLE = "FAIBLE"
+CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
+
+
+@dataclass
+class DecisionWorkflow:
+    """Informations workflow et sécurité associées à une décision."""
+
+    decision: str
+    action_recommandee: str
+    priorite: str
+    revision_requise: bool
+    alerte_securite: bool = False
+
+
 @dataclass
 class ClinicalDecision:
     """Résultat d'une décision clinique automatisée.
@@ -35,11 +52,52 @@ class ClinicalDecision:
     confiance: float
     probabilites: dict[str, float]
     niveau_confiance: str
-    decision: str
-    action_recommandee: str
-    priorite: str
-    revision_requise: bool
-    alerte_securite: bool = False
+    workflow: DecisionWorkflow
+
+    @property
+    def decision(self) -> str:
+        """Texte descriptif de la décision clinique."""
+        return self.workflow.decision
+
+    @decision.setter
+    def decision(self, value: str) -> None:
+        self.workflow.decision = value
+
+    @property
+    def action_recommandee(self) -> str:
+        """Action clinique recommandée."""
+        return self.workflow.action_recommandee
+
+    @action_recommandee.setter
+    def action_recommandee(self, value: str) -> None:
+        self.workflow.action_recommandee = value
+
+    @property
+    def priorite(self) -> str:
+        """Priorité clinique du cas."""
+        return self.workflow.priorite
+
+    @priorite.setter
+    def priorite(self, value: str) -> None:
+        self.workflow.priorite = value
+
+    @property
+    def revision_requise(self) -> bool:
+        """Indique si une révision humaine est requise."""
+        return self.workflow.revision_requise
+
+    @revision_requise.setter
+    def revision_requise(self, value: bool) -> None:
+        self.workflow.revision_requise = value
+
+    @property
+    def alerte_securite(self) -> bool:
+        """Indique si une alerte de sécurité est active."""
+        return self.workflow.alerte_securite
+
+    @alerte_securite.setter
+    def alerte_securite(self, value: bool) -> None:
+        self.workflow.alerte_securite = value
 
 
 def categoriser_confiance(
@@ -58,12 +116,12 @@ def categoriser_confiance(
         seuils = DecisionThresholds()
 
     if confiance >= seuils.haute:
-        return "HAUTE"
+        return CONFIDENCE_HAUTE
     if confiance >= seuils.moyenne:
-        return "MOYENNE"
+        return CONFIDENCE_MOYENNE
     if confiance >= seuils.faible:
-        return "FAIBLE"
-    return "TRES_FAIBLE"
+        return CONFIDENCE_FAIBLE
+    return CONFIDENCE_TRES_FAIBLE
 
 
 def generer_decision_clinique(
@@ -134,11 +192,13 @@ def generer_decision_clinique(
         confiance=confiance,
         probabilites=prob_dict,
         niveau_confiance=niveau_confiance,
-        decision=decision,
-        action_recommandee=action,
-        priorite=priorite,
-        revision_requise=revision_requise,
-        alerte_securite=False,  # Sera mis à jour par rules.py
+        workflow=DecisionWorkflow(
+            decision=decision,
+            action_recommandee=action,
+            priorite=priorite,
+            revision_requise=revision_requise,
+            alerte_securite=False,
+        ),
     )
 
 
@@ -218,10 +278,12 @@ def statistiques_decisions(decisions: list[ClinicalDecision]) -> dict[str, float
     if n_total == 0:
         return {}
 
-    n_haute = sum(1 for d in decisions if d.niveau_confiance == "HAUTE")
-    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == "MOYENNE")
-    n_faible = sum(1 for d in decisions if d.niveau_confiance == "FAIBLE")
-    n_tres_faible = sum(1 for d in decisions if d.niveau_confiance == "TRES_FAIBLE")
+    n_haute = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_HAUTE)
+    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_MOYENNE)
+    n_faible = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_FAIBLE)
+    n_tres_faible = sum(
+        1 for d in decisions if d.niveau_confiance == CONFIDENCE_TRES_FAIBLE
+    )
 
     n_revisions = sum(1 for d in decisions if d.revision_requise)
     n_alertes = sum(1 for d in decisions if d.alerte_securite)

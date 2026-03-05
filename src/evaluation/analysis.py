@@ -1,8 +1,6 @@
 """Analyse metier SAD: couverture, tranches de confiance, cout total."""
 
-from typing import Sequence, Iterable
-
-import pandas as pd
+from collections.abc import Iterable, Sequence
 
 from src.evaluation.metrics import (
     accuracy_globale,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,27 @@ from src.models.log_reg import (
     predict_with_confidence,
     train_logistic_regression,
 )
+
+
+@dataclass(frozen=True)
+class RuntimeConfig:
+    """Paramètres effectifs d'exécution."""
+
+    img_size: int
+    max_iter: int
+    cv: int
+    mode: str
+
+
+@dataclass(frozen=True)
+class DatasetBundle:
+    """Données preprocessées pour la tâche 2."""
+
+    x_train_flat: np.ndarray
+    y_train: np.ndarray
+    x_test_flat: np.ndarray
+    y_test: np.ndarray
+    class_names: list[str]
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,23 +70,27 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> None:
-    """Point d'entrée principal pour la tâche 2."""
-    args = parse_args()
-
-    effective_img_size = args.img_size
-    effective_max_iter = args.max_iter
-    effective_cv = args.cv
+def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
+    """Construit la configuration effective (FAST/STD)."""
+    img_size = args.img_size
+    max_iter = args.max_iter
+    cv = args.cv
+    mode = "FAST" if args.fast else "STANDARD"
 
     if args.fast:
         print("Mode FAST activé: réduction de img-size, max-iter et cv pour accélérer")
-        effective_img_size = min(effective_img_size, 32)
-        effective_max_iter = min(effective_max_iter, 200)
-        effective_cv = min(effective_cv, 2)
+        img_size = min(img_size, 32)
+        max_iter = min(max_iter, 200)
+        cv = min(cv, 2)
 
-    train_dir = Path(args.data_dir) / "Training"
-    test_dir = Path(args.data_dir) / "Testing"
-    image_size = (effective_img_size, effective_img_size)
+    return RuntimeConfig(img_size=img_size, max_iter=max_iter, cv=cv, mode=mode)
+
+
+def load_dataset_bundle(data_dir: str, runtime: RuntimeConfig) -> DatasetBundle:
+    """Charge et preprocess les données train/test."""
+    train_dir = Path(data_dir) / "Training"
+    test_dir = Path(data_dir) / "Testing"
+    image_size = (runtime.img_size, runtime.img_size)
 
     train_split = load_dataset_split(train_dir, image_size=image_size)
     test_split = load_dataset_split(
@@ -86,45 +112,75 @@ def main() -> None:
         one_hot=False,
     )
 
-    x_train_flat = flatten_images(x_train)
-    x_test_flat = flatten_images(x_test)
-
-    print("--- Tâche 2: Régression Logistique + Calibration ---")
-    print(
-        f"Mode={'FAST' if args.fast else 'STANDARD'} | "
-        f"img_size={effective_img_size} | max_iter={effective_max_iter} | cv={effective_cv}"
+    return DatasetBundle(
+        x_train_flat=flatten_images(x_train),
+        y_train=y_train,
+        x_test_flat=flatten_images(x_test),
+        y_test=y_test,
+        class_names=train_split.class_names,
     )
-    print(f"Train shape: {x_train_flat.shape} | Test shape: {x_test_flat.shape}")
-    print(f"Classes: {train_split.class_names}")
 
+
+def run_logreg_pipeline(
+    bundle: DatasetBundle,
+    runtime: RuntimeConfig,
+    calibration_method: str,
+    uncertainty_threshold: float,
+) -> tuple[float, float, dict[str, float], dict[str, float]]:
+    """Entraîne, calibre et évalue le modèle de régression logistique."""
     base_model = train_logistic_regression(
-        x_train_flat,
-        y_train,
-        max_iter=effective_max_iter,
+        bundle.x_train_flat,
+        bundle.y_train,
+        max_iter=runtime.max_iter,
     )
-    base_probs = base_model.predict_proba(x_test_flat)
-    base_preds = np.argmax(base_probs, axis=1)
-    base_acc = accuracy_score(y_test, base_preds)
+    base_probs = base_model.predict_proba(bundle.x_test_flat)
+    base_acc = accuracy_score(bundle.y_test, np.argmax(base_probs, axis=1))
 
     calibrated_model = calibrate_classifier(
         base_model=base_model,
-        method=args.calibration,
-        cv=effective_cv,
+        method=calibration_method,
+        cv=runtime.cv,
     )
-    calibrated_model.fit(x_train_flat, y_train)
+    calibrated_model.fit(bundle.x_train_flat, bundle.y_train)
 
-    calibrated_probs = calibrated_model.predict_proba(x_test_flat)
-    calibrated_preds = np.argmax(calibrated_probs, axis=1)
-    calibrated_acc = accuracy_score(y_test, calibrated_preds)
+    calibrated_probs = calibrated_model.predict_proba(bundle.x_test_flat)
+    calibrated_acc = accuracy_score(bundle.y_test, np.argmax(calibrated_probs, axis=1))
 
     summary = predict_with_confidence(
         model=calibrated_model,
-        x_data=x_test_flat,
-        uncertainty_threshold=args.uncertainty_threshold,
+        x_data=bundle.x_test_flat,
+        uncertainty_threshold=uncertainty_threshold,
     )
     confidence_stats = summarize_confidence_distribution(summary.max_prob)
     uncertain_stats = analyze_uncertain_predictions(
-        summary.max_prob, threshold=args.uncertainty_threshold
+        summary.max_prob,
+        threshold=uncertainty_threshold,
+    )
+
+    return base_acc, calibrated_acc, confidence_stats, uncertain_stats
+
+
+def main() -> None:
+    """Point d'entrée principal pour la tâche 2."""
+    args = parse_args()
+    runtime = resolve_runtime_config(args)
+    bundle = load_dataset_bundle(args.data_dir, runtime)
+
+    print("--- Tâche 2: Régression Logistique + Calibration ---")
+    print(
+        f"Mode={runtime.mode} | "
+        f"img_size={runtime.img_size} | max_iter={runtime.max_iter} | cv={runtime.cv}"
+    )
+    print(
+        f"Train shape: {bundle.x_train_flat.shape} | Test shape: {bundle.x_test_flat.shape}"
+    )
+    print(f"Classes: {bundle.class_names}")
+
+    base_acc, calibrated_acc, confidence_stats, uncertain_stats = run_logreg_pipeline(
+        bundle=bundle,
+        runtime=runtime,
+        calibration_method=args.calibration,
+        uncertainty_threshold=args.uncertainty_threshold,
     )
 
     print("\n--- Accuracy ---")

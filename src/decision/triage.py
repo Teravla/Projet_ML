@@ -7,7 +7,13 @@ du niveau de confiance, et des alertes de sécurité.
 
 from collections import Counter
 
-from src.decision.engine import ClinicalDecision
+from src.decision.engine import (
+    ClinicalDecision,
+    CONFIDENCE_FAIBLE,
+    CONFIDENCE_HAUTE,
+    CONFIDENCE_MOYENNE,
+    CONFIDENCE_TRES_FAIBLE,
+)
 from src.config.thresholds import (
     GRAVITE_CLINIQUE,
     PRIORITE_URGENTE,
@@ -15,6 +21,54 @@ from src.config.thresholds import (
     PRIORITE_NORMALE,
     PRIORITE_ROUTINE,
 )
+
+
+DEFAULT_GRAVITE = 3
+GRAVITE_SEUIL_URGENTE = 4
+GRAVITE_MALIGNE = 5
+GRAVITE_BENIGNE = 3
+MALIGNANCY_SUSPECT_LEVELS = {CONFIDENCE_MOYENNE, CONFIDENCE_FAIBLE}
+
+
+def _priorite_incertitude_tres_faible(gravite: int) -> str:
+    """Détermine la priorité en cas de confiance très faible."""
+    if gravite >= GRAVITE_SEUIL_URGENTE:
+        return PRIORITE_URGENTE
+    return PRIORITE_ELEVEE
+
+
+def _priorite_cas_malin(niveau_confiance: str) -> str:
+    """Détermine la priorité pour un cas de gravité maximale."""
+    if niveau_confiance == CONFIDENCE_HAUTE:
+        return PRIORITE_URGENTE
+    if niveau_confiance in MALIGNANCY_SUSPECT_LEVELS:
+        return PRIORITE_ELEVEE
+    return PRIORITE_URGENTE
+
+
+def _priorite_cas_benin(niveau_confiance: str) -> str:
+    """Détermine la priorité pour un cas bénin."""
+    if niveau_confiance == CONFIDENCE_HAUTE:
+        return PRIORITE_NORMALE
+    return PRIORITE_ELEVEE
+
+
+def _priorite_pas_tumeur(niveau_confiance: str) -> str:
+    """Détermine la priorité pour un cas non tumoral."""
+    if niveau_confiance == CONFIDENCE_HAUTE:
+        return PRIORITE_ROUTINE
+    if niveau_confiance == CONFIDENCE_MOYENNE:
+        return PRIORITE_NORMALE
+    return PRIORITE_ELEVEE
+
+
+def _priorite_par_gravite(gravite: int, niveau_confiance: str) -> str:
+    """Détermine la priorité à partir de la gravité et de la confiance."""
+    if gravite >= GRAVITE_MALIGNE:
+        return _priorite_cas_malin(niveau_confiance)
+    if gravite >= GRAVITE_BENIGNE:
+        return _priorite_cas_benin(niveau_confiance)
+    return _priorite_pas_tumeur(niveau_confiance)
 
 
 def determiner_priorite(
@@ -46,40 +100,15 @@ def determiner_priorite(
     if decision.alerte_securite:
         return PRIORITE_URGENTE
 
+    classe_norm = decision.classe_predite.lower()
+    gravite = gravites.get(classe_norm, DEFAULT_GRAVITE)
+
     # Règle 2: Incertitude très élevée = priorité élevée ou urgente
-    if decision.niveau_confiance == "TRES_FAIBLE":
-        # Si la classe suspectée est grave, urgence maximale
-        classe_norm = decision.classe_predite.lower()
-        if gravites.get(classe_norm, 3) >= 4:
-            return PRIORITE_URGENTE
-        else:
-            return PRIORITE_ELEVEE
+    if decision.niveau_confiance == CONFIDENCE_TRES_FAIBLE:
+        return _priorite_incertitude_tres_faible(gravite)
 
     # Règle 3: Combiner gravité de la classe et confiance
-    classe_norm = decision.classe_predite.lower()
-    gravite = gravites.get(classe_norm, 3)  # Défaut gravité moyenne
-
-    if gravite >= 5:  # Gliome (malin)
-        if decision.niveau_confiance == "HAUTE":
-            return PRIORITE_URGENTE  # Tumeur maligne confirmée
-        elif decision.niveau_confiance in ["MOYENNE", "FAIBLE"]:
-            return PRIORITE_ELEVEE  # Tumeur maligne suspectée
-        else:
-            return PRIORITE_URGENTE  # Incertitude déjà gérée plus haut
-
-    elif gravite >= 3:  # Méningiome, Pituitaire (bénignes)
-        if decision.niveau_confiance == "HAUTE":
-            return PRIORITE_NORMALE  # Tumeur bénigne confirmée
-        else:
-            return PRIORITE_ELEVEE  # Tumeur bénigne suspectée
-
-    else:  # Pas de tumeur
-        if decision.niveau_confiance == "HAUTE":
-            return PRIORITE_ROUTINE  # Pas de tumeur, haute confiance
-        elif decision.niveau_confiance == "MOYENNE":
-            return PRIORITE_NORMALE  # Pas de tumeur, à vérifier
-        else:
-            return PRIORITE_ELEVEE  # Pas de tumeur mais doute
+    return _priorite_par_gravite(gravite, decision.niveau_confiance)
 
 
 def appliquer_triage(
