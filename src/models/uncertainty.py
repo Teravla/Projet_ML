@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import keras
 import numpy as np
 import tensorflow as tf
 
@@ -20,7 +21,7 @@ class MCUncertaintySummary:
 
 
 def mc_dropout_predict(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_data: np.ndarray,
     n_iter: int = 20,
 ) -> MCUncertaintySummary:

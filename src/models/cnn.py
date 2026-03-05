@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import keras
 import tensorflow as tf
 
 
@@ -23,54 +24,51 @@ def build_cnn_classifier(
     num_classes: int,
     dropout_rate: float = 0.3,
     learning_rate: float = 1e-3,
-) -> tf.keras.Model:
+) -> keras.Model:
     """Construit un CNN classique avec sortie logits."""
 
-    inputs = tf.keras.Input(shape=input_shape, name="image")
+    inputs = keras.Input(shape=input_shape, name="image")
 
-    x = tf.keras.layers.Conv2D(32, 3, padding="same", activation="relu", name="conv1")(
+    x = keras.layers.Conv2D(32, 3, padding="same", activation="relu", name="conv1")(
         inputs
     )
-    x = tf.keras.layers.MaxPooling2D(pool_size=2, name="pool1")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2, name="pool1")(x)
 
-    x = tf.keras.layers.Conv2D(64, 3, padding="same", activation="relu", name="conv2")(
-        x
-    )
-    x = tf.keras.layers.MaxPooling2D(pool_size=2, name="pool2")(x)
+    x = keras.layers.Conv2D(64, 3, padding="same", activation="relu", name="conv2")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2, name="pool2")(x)
 
-    x = tf.keras.layers.Conv2D(128, 3, padding="same", activation="relu", name="conv3")(
-        x
-    )
-    x = tf.keras.layers.MaxPooling2D(pool_size=2, name="pool3")(x)
+    x = keras.layers.Conv2D(128, 3, padding="same", activation="relu", name="conv3")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2, name="pool3")(x)
 
-    x = tf.keras.layers.Flatten(name="flatten")(x)
-    x = tf.keras.layers.Dense(256, activation="relu", name="dense1")(x)
-    x = tf.keras.layers.Dropout(dropout_rate, name="dropout")(x)
-    logits = tf.keras.layers.Dense(num_classes, name="logits")(x)
+    x = keras.layers.Flatten(name="flatten")(x)
+    x = keras.layers.Dense(256, activation="relu", name="dense1")(x)
+    x = keras.layers.Dropout(dropout_rate, name="dropout")(x)
+    logits = keras.layers.Dense(num_classes, name="logits")(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=logits, name="cnn_logits")
+    model = keras.Model(inputs=inputs, outputs=logits, name="cnn_logits")
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
     return model
 
 
 def train_cnn_classifier(
-    model: tf.keras.Model,
-    x_train: np.ndarray,
-    y_train: np.ndarray,
-    x_val: np.ndarray,
-    y_val: np.ndarray,
-    epochs: int = 10,
-    batch_size: int = 64,
+    model: keras.Model,
+    train_data: tuple[np.ndarray, np.ndarray],
+    validation_data: tuple[np.ndarray, np.ndarray],
+    training_config: CNNTrainingConfig | None = None,
     verbose: int = 1,
-) -> tf.keras.callbacks.History:
+) -> keras.callbacks.History:
     """Entraîne le CNN avec early stopping."""
 
+    x_train, y_train = train_data
+    x_val, y_val = validation_data
+    config = training_config or CNNTrainingConfig()
+
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(
+        keras.callbacks.EarlyStopping(
             monitor="val_loss",
             patience=3,
             restore_best_weights=True,
@@ -80,15 +78,15 @@ def train_cnn_classifier(
         x_train,
         y_train,
         validation_data=(x_val, y_val),
-        epochs=epochs,
-        batch_size=batch_size,
+        epochs=config.epochs,
+        batch_size=config.batch_size,
         callbacks=callbacks,
         verbose=verbose,
     )
 
 
 def predict_logits(
-    model: tf.keras.Model, x_data: np.ndarray, batch_size: int = 256
+    model: keras.Model, x_data: np.ndarray, batch_size: int = 256
 ) -> np.ndarray:
     """Retourne les logits prédits."""
 
@@ -97,7 +95,7 @@ def predict_logits(
 
 
 def predict_probabilities(
-    model: tf.keras.Model, x_data: np.ndarray, batch_size: int = 256
+    model: keras.Model, x_data: np.ndarray, batch_size: int = 256
 ) -> np.ndarray:
     """Retourne les probabilités prédites via softmax."""
 
@@ -111,66 +109,66 @@ def build_cnn_optimized(
     dropout_rate: float = 0.3,
     learning_rate: float = 3e-4,
     l2_reg: float = 3e-5,
-) -> tf.keras.Model:
+) -> keras.Model:
     """CNN optimisé stable pour limiter l'overfit et les écarts train/val."""
 
-    regularizer = tf.keras.regularizers.l2(l2_reg)
-    inputs = tf.keras.Input(shape=input_shape, name="image")
+    regularizer = keras.regularizers.l2(l2_reg)
+    inputs = keras.Input(shape=input_shape, name="image")
 
     # Bloc 1
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         32, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(inputs)
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         32, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(dropout_rate * 0.5)(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(dropout_rate * 0.5)(x)
 
     # Bloc 2
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         64, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(x)
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         64, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(dropout_rate * 0.8)(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(dropout_rate * 0.8)(x)
 
     # Bloc 3
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         128, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(x)
-    x = tf.keras.layers.Conv2D(
+    x = keras.layers.Conv2D(
         128, 3, padding="same", activation="relu", kernel_regularizer=regularizer
     )(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(dropout_rate)(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(dropout_rate)(x)
 
     # Global Average Pooling (meilleur que Flatten pour réduire overfitting)
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dropout(dropout_rate * 1.2)(x)
+    x = keras.layers.GlobalAveragePooling2D()(x)
+    x = keras.layers.Dropout(dropout_rate * 1.2)(x)
 
     # Dense finale
-    x = tf.keras.layers.Dense(256, activation="relu", kernel_regularizer=regularizer)(x)
-    x = tf.keras.layers.Dropout(dropout_rate * 1.5)(x)
+    x = keras.layers.Dense(256, activation="relu", kernel_regularizer=regularizer)(x)
+    x = keras.layers.Dropout(dropout_rate * 1.5)(x)
 
-    logits = tf.keras.layers.Dense(num_classes, name="logits")(x)
+    logits = keras.layers.Dense(num_classes, name="logits")(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=logits, name="cnn_optimized")
+    model = keras.Model(inputs=inputs, outputs=logits, name="cnn_optimized")
 
     # Optimizer avec gradient clipping pour stabilité
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
     return model
 
 
 def extract_intermediate_activations(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_data: np.ndarray,
     layer_names: list[str],
     batch_size: int = 256,
@@ -180,7 +178,7 @@ def extract_intermediate_activations(
     activations: dict[str, np.ndarray] = {}
     for layer_name in layer_names:
         layer = model.get_layer(layer_name)
-        activation_model = tf.keras.Model(inputs=model.input, outputs=layer.output)
+        activation_model = keras.Model(inputs=model.input, outputs=layer.output)
         values = activation_model.predict(x_data, batch_size=batch_size, verbose=0)
         activations[layer_name] = np.asarray(values)
     return activations

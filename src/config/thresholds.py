@@ -5,7 +5,6 @@ de décision clinique pour le système d'aide à la décision (SAD).
 """
 
 from dataclasses import dataclass
-from typing import Dict
 
 
 # ===== Seuils de Confiance =====
@@ -58,7 +57,7 @@ class CostParameters:
 
 
 # Mapping des classes vers la gravité clinique (1=routine, 5=urgent)
-GRAVITE_CLINIQUE: Dict[str, int] = {
+GRAVITE_CLINIQUE: dict[str, int] = {
     "glioma": 5,  # Tumeur maligne - urgent
     "meningioma": 3,  # Tumeur bénigne mais intervention possible
     "pituitary": 3,  # Tumeur bénigne mais impact hormonal

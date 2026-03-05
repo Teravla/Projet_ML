@@ -5,9 +5,6 @@ c'est-à-dire les cas où le système prédit "Pas de tumeur" alors qu'une tumeu
 est présente. Dans un contexte médical, ces erreurs sont particulièrement graves.
 """
 
-from typing import List
-import numpy as np
-
 from src.decision.engine import ClinicalDecision
 from src.config.thresholds import SEUIL_SECURITE_NEGATIF
 
@@ -59,8 +56,8 @@ def appliquer_regle_securite_negatif(
 
 
 def appliquer_regles_securite_batch(
-    decisions: List[ClinicalDecision], seuil_securite: float = SEUIL_SECURITE_NEGATIF
-) -> List[ClinicalDecision]:
+    decisions: list[ClinicalDecision], seuil_securite: float = SEUIL_SECURITE_NEGATIF
+) -> list[ClinicalDecision]:
     """Applique les règles de sécurité sur un lot de décisions.
 
     Args:
@@ -97,8 +94,8 @@ def detecter_cas_ambigus(decision: ClinicalDecision, seuil_ecart: float = 0.15) 
 
 
 def identifier_cas_limites(
-    decisions: List[ClinicalDecision], seuil_ecart: float = 0.15
-) -> List[ClinicalDecision]:
+    decisions: list[ClinicalDecision], seuil_ecart: float = 0.15
+) -> list[ClinicalDecision]:
     """Identifie les cas limites nécessitant une attention particulière.
 
     Les cas limites incluent:
@@ -134,7 +131,7 @@ def identifier_cas_limites(
     return cas_limites
 
 
-def statistiques_securite(decisions: List[ClinicalDecision]) -> dict:
+def statistiques_securite(decisions: list[ClinicalDecision]) -> dict:
     """Calcule des statistiques de sécurité sur les décisions.
 
     Args:

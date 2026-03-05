@@ -4,18 +4,19 @@
 Lance un serveur web qui expose les donnees du pipeline SAD en JSON.
 
 Usage:
-    python scripts/run_flask_dashboard.py
+    python src/cli/dashboard.py
 
     Puis ouvrir: http://localhost:5000/dashboard
 """
 
 import sys
 from pathlib import Path
+import keras
 import numpy as np
 from datetime import datetime
-import tensorflow as tf
-from typing import Optional, Tuple, List
+from typing import Optional
 from io import BytesIO
+from reportlab.pdfgen import canvas
 
 try:
     from flask import Flask, jsonify, request, make_response
@@ -23,27 +24,13 @@ except ImportError:
     print("Flask not installed. Install with: pip install flask")
     sys.exit(1)
 
-try:
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib.units import inch
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Preformatted
-    from reportlab.lib.enums import TA_CENTER
-
-    REPORTLAB_AVAILABLE = True
-except ImportError:
-    REPORTLAB_AVAILABLE = False
-    print("Warning: reportlab not installed. PDF generation will be disabled.")
-    print("Install with: pip install reportlab")
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.decision.engine import generer_recommandation
 from src.decision.rules import appliquer_regle_securite_negatif
 from src.decision.triage import appliquer_triage
 from src.evaluation.analysis import analyser_performance_sad
-from src.config.thresholds import GRAVITE_CLINIQUE
 from src.data.loader import load_dataset_split
 
 app = Flask(__name__, static_folder=str(PROJECT_ROOT / "web"), static_url_path="")
@@ -91,7 +78,7 @@ def load_model_and_data() -> bool:
 
         # Charger le modèle
         print(f"📦 Chargement du modèle: {model_path.name}")
-        MODEL_STATE["model"] = tf.keras.models.load_model(model_path)
+        MODEL_STATE["model"] = keras.models.load_model(model_path)
         MODEL_STATE["model_path"] = str(model_path)
 
         # Charger les données de test
@@ -412,7 +399,6 @@ def api_stats():
 @app.route("/api/rapport/<patient_id>/pdf", methods=["GET"])
 def api_rapport_pdf(patient_id: str):
     """Génère un rapport PDF pour un patient."""
-    from reportlab.pdfgen import canvas
 
     decisions, _ = get_or_generate_decisions(n_cases=120)
     decision = next((d for d in decisions if d.patient_id == patient_id), None)
@@ -573,7 +559,6 @@ if __name__ == "__main__":
     print("   GET  http://localhost:5000/api/metrics")
     print("   GET  http://localhost:5000/api/rapport/<patient_id>")
     print("   GET  http://localhost:5000/api/rapport/<patient_id>/pdf  (NOUVEAU!)")
-    print("=")
     print("   GET  http://localhost:5000/api/health")
     print("\n🛑 Appuyer sur CTRL+C pour arrêter le serveur")
     print("=" * 70 + "\n")

@@ -22,6 +22,7 @@ from src.models.calibration import (
     summarize_confidence_distribution,
 )
 from src.models.cnn import (
+    CNNTrainingConfig,
     build_cnn_classifier,
     extract_intermediate_activations,
     predict_logits,
@@ -119,12 +120,14 @@ def main() -> None:
 
     train_cnn_classifier(
         model=model,
-        x_train=x_train,
-        y_train=y_train,
-        x_val=x_val,
-        y_val=y_val,
-        epochs=effective_epochs,
-        batch_size=effective_batch_size,
+        train_data=(x_train, y_train),
+        validation_data=(x_val, y_val),
+        training_config=CNNTrainingConfig(
+            epochs=effective_epochs,
+            batch_size=effective_batch_size,
+            learning_rate=args.learning_rate,
+            dropout_rate=args.dropout_rate,
+        ),
         verbose=1,
     )
 

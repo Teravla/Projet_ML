@@ -1,13 +1,13 @@
 """Calcul du cout clinique (FN/FP/Revision)."""
 
-from typing import Iterable, Dict
+from typing import Iterable
 
 from src.config.thresholds import CostParameters
 
 
 def compter_fn_fp_tumeur(
     y_true: Iterable[str], y_pred: Iterable[str], classe_saine: str = "notumor"
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Compte FN/FP pour un scenario de depistage tumeur vs non tumeur.
 
     - Faux negatif (FN): vraie classe tumeur, prediction classe saine.
@@ -55,7 +55,7 @@ def analyser_couts(
     revisions: int,
     classe_saine: str = "notumor",
     cost_params: CostParameters | None = None,
-) -> Dict[str, int]:
+) -> dict[str, int]:
     """Retourne un resume complet FN/FP/Revision/Cout total."""
     counts = compter_fn_fp_tumeur(y_true, y_pred, classe_saine=classe_saine)
     cout_total = calculer_cout_total(

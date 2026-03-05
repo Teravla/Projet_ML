@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+import keras
 import numpy as np
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.model_selection import train_test_split
@@ -52,7 +53,7 @@ def analyze_class_distribution(
 
 
 def analyze_model_predictions(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_test: np.ndarray,
     y_test: np.ndarray,
     class_names: list[str],
@@ -95,7 +96,6 @@ def analyze_model_predictions(
     # Matrice de confusion
     print("\nMatrice de confusion:")
     cm = confusion_matrix(y_test, y_pred)
-    max_val = cm.max()
 
     header = "      " + "  ".join(f"{c[:4]:>4s}" for c in class_names)
     print(header)

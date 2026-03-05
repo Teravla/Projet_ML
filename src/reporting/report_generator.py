@@ -1,7 +1,5 @@
 """Generation de rapports textuels d'aide a la decision."""
 
-from typing import List
-
 import pandas as pd
 
 from src.decision.engine import ClinicalDecision
@@ -83,12 +81,12 @@ def creer_rapport_decision(
     return "\n".join(lines)
 
 
-def generer_rapports_batch(decisions: List[ClinicalDecision]) -> List[str]:
+def generer_rapports_batch(decisions: list[ClinicalDecision]) -> list[str]:
     """Genere un rapport textuel pour chaque decision clinique."""
     return [creer_rapport_decision(d.patient_id, d, d.confiance) for d in decisions]
 
 
-def creer_tableau_bord(decisions: List[ClinicalDecision]) -> pd.DataFrame:
+def creer_tableau_bord(decisions: list[ClinicalDecision]) -> pd.DataFrame:
     """Construit un tableau de bord compact pour pilotage clinique."""
     rows = []
     for d in decisions:

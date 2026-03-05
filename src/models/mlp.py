@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import keras
 import numpy as np
-import tensorflow as tf
 
 
 @dataclass(frozen=True)
@@ -25,19 +25,19 @@ def build_mlp_classifier(
     hidden_units: tuple[int, int] = (256, 128),
     dropout_rate: float = 0.3,
     learning_rate: float = 1e-3,
-) -> tf.keras.Model:
+) -> keras.Model:
     """Construit un classifieur MLP à sortie probabiliste (softmax)."""
 
-    inputs = tf.keras.Input(shape=(input_dim,), name="features")
-    x = tf.keras.layers.Dense(hidden_units[0], activation="relu")(inputs)
-    x = tf.keras.layers.Dropout(dropout_rate, name="dropout_1")(x)
-    x = tf.keras.layers.Dense(hidden_units[1], activation="relu")(x)
-    x = tf.keras.layers.Dropout(dropout_rate, name="dropout_2")(x)
-    outputs = tf.keras.layers.Dense(num_classes, activation="softmax", name="probs")(x)
+    inputs = keras.Input(shape=(input_dim,), name="features")
+    x = keras.layers.Dense(hidden_units[0], activation="relu")(inputs)
+    x = keras.layers.Dropout(dropout_rate, name="dropout_1")(x)
+    x = keras.layers.Dense(hidden_units[1], activation="relu")(x)
+    x = keras.layers.Dropout(dropout_rate, name="dropout_2")(x)
+    outputs = keras.layers.Dense(num_classes, activation="softmax", name="probs")(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="mlp_probabilistic")
+    model = keras.Model(inputs=inputs, outputs=outputs, name="mlp_probabilistic")
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
         loss="sparse_categorical_crossentropy",
         metrics=["accuracy"],
     )
@@ -45,7 +45,7 @@ def build_mlp_classifier(
 
 
 def train_mlp_classifier(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_train: np.ndarray,
     y_train: np.ndarray,
     x_val: np.ndarray,
@@ -53,11 +53,11 @@ def train_mlp_classifier(
     epochs: int = 15,
     batch_size: int = 64,
     verbose: int = 1,
-) -> tf.keras.callbacks.History:
+) -> keras.callbacks.History:
     """Entraîne le MLP avec early stopping sur la validation."""
 
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(
+        keras.callbacks.EarlyStopping(
             monitor="val_loss",
             patience=3,
             restore_best_weights=True,
@@ -75,7 +75,7 @@ def train_mlp_classifier(
 
 
 def predict_probabilities(
-    model: tf.keras.Model, x_data: np.ndarray, batch_size: int = 256
+    model: keras.Model, x_data: np.ndarray, batch_size: int = 256
 ) -> np.ndarray:
     """Retourne les probabilités de classes pour un batch de données."""
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import keras
 import numpy as np
 import tensorflow as tf
 from sklearn.calibration import CalibratedClassifierCV
@@ -82,8 +83,8 @@ class TemperatureScaler:
 
         logits_tf = tf.convert_to_tensor(logits, dtype=tf.float32)
         labels_tf = tf.convert_to_tensor(labels, dtype=tf.int32)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
-        loss_fn = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+        optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+        loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
         for step in range(epochs):
             with tf.GradientTape() as tape:

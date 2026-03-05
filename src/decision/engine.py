@@ -5,13 +5,10 @@ des probabilités de modèle en recommandations cliniques actionnables.
 """
 
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import Optional
 import numpy as np
 
 from src.config.thresholds import (
-    SEUIL_CONFIANCE_HAUTE,
-    SEUIL_CONFIANCE_MOYENNE,
-    SEUIL_CONFIANCE_FAIBLE,
     DecisionThresholds,
 )
 
@@ -36,7 +33,7 @@ class ClinicalDecision:
     patient_id: str
     classe_predite: str
     confiance: float
-    probabilites: Dict[str, float]
+    probabilites: dict[str, float]
     niveau_confiance: str
     decision: str
     action_recommandee: str
@@ -73,7 +70,7 @@ def categoriser_confiance(
 def generer_decision_clinique(
     patient_id: str,
     probabilites: np.ndarray,
-    classes: List[str],
+    classes: list[str],
     seuils: Optional[DecisionThresholds] = None,
 ) -> ClinicalDecision:
     """Génère une décision clinique à partir des probabilités du modèle.
@@ -148,7 +145,7 @@ def generer_decision_clinique(
 
 def generer_recommandation(
     probabilites: np.ndarray,
-    classes: List[str],
+    classes: list[str],
     seuils: Optional[DecisionThresholds] = None,
     patient_id: str = "P_00000",
 ) -> ClinicalDecision:
@@ -176,10 +173,10 @@ def generer_recommandation(
 
 def traiter_batch_decisions(
     probabilites_batch: np.ndarray,
-    classes: List[str],
-    patient_ids: Optional[List[str]] = None,
+    classes: list[str],
+    patient_ids: Optional[list[str]] = None,
     seuils: Optional[DecisionThresholds] = None,
-) -> List[ClinicalDecision]:
+) -> list[ClinicalDecision]:
     """Traite un lot de prédictions pour générer des décisions cliniques.
 
     Args:
@@ -209,7 +206,7 @@ def traiter_batch_decisions(
     return decisions
 
 
-def statistiques_decisions(decisions: List[ClinicalDecision]) -> Dict[str, float]:
+def statistiques_decisions(decisions: list[ClinicalDecision]) -> dict[str, float]:
     """Calcule des statistiques sur un ensemble de décisions.
 
     Args:

@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
+import keras
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
@@ -119,7 +120,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def train_model_with_augmentation(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_train: np.ndarray,
     y_train: np.ndarray,
     x_val: np.ndarray,
@@ -127,37 +128,37 @@ def train_model_with_augmentation(
     epochs: int = 30,
     batch_size: int = 32,
     use_augmentation: bool = True,
-) -> tf.keras.callbacks.History:
+) -> keras.callbacks.History:
     """Entraîne avec data augmentation agressif et learning rate scheduling optimisé."""
 
     # Augmentation modérée pour IRM: préserver la structure anatomique.
-    train_augmentation = tf.keras.Sequential(
+    train_augmentation = keras.Sequential(
         [
-            tf.keras.layers.RandomFlip("horizontal"),
-            tf.keras.layers.RandomRotation(0.05),
-            tf.keras.layers.RandomZoom(0.08),
-            tf.keras.layers.RandomTranslation(0.06, 0.06),
-            tf.keras.layers.RandomContrast(0.05),
-            tf.keras.layers.RandomBrightness(0.05, value_range=(0.0, 1.0)),
+            keras.layers.RandomFlip("horizontal"),
+            keras.layers.RandomRotation(0.05),
+            keras.layers.RandomZoom(0.08),
+            keras.layers.RandomTranslation(0.06, 0.06),
+            keras.layers.RandomContrast(0.05),
+            keras.layers.RandomBrightness(0.05, value_range=(0.0, 1.0)),
         ]
     )
 
     # Callbacks optimisés pour meilleure convergence
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(
+        keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
             patience=25,  # Très patient pour laisser converger
             restore_best_weights=True,
             mode="max",
         ),
-        tf.keras.callbacks.ReduceLROnPlateau(
+        keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
             factor=0.5,
             patience=8,  # Plus patient avant de réduire
             min_lr=1e-7,
             verbose=1,
         ),
-        tf.keras.callbacks.ModelCheckpoint(
+        keras.callbacks.ModelCheckpoint(
             filepath="artifacts/models/best_cnn_checkpoint.keras",
             monitor="val_accuracy",
             save_best_only=True,
@@ -195,11 +196,11 @@ def build_transfer_learning_model(
     input_shape: tuple[int, int, int],
     num_classes: int = 4,
     learning_rate: float = 5e-5,
-) -> tf.keras.Model:
+) -> keras.Model:
     """Transfer learning avec EfficientNetB0."""
 
     # Charger EfficientNetB0 pré-entraîné
-    base_model = tf.keras.applications.EfficientNetB0(
+    base_model = keras.applications.EfficientNetB0(
         input_shape=input_shape,
         include_top=False,
         weights="imagenet",
@@ -209,37 +210,37 @@ def build_transfer_learning_model(
     for layer in base_model.layers[:-60]:
         layer.trainable = False
 
-    inputs = tf.keras.Input(shape=input_shape)
+    inputs = keras.Input(shape=input_shape)
 
     # Les images du pipeline sont en [0, 1]. EfficientNetB0 (Keras) est calibré
     # pour des entrées [0, 255], donc on remonte l'échelle avant le backbone.
-    x = tf.keras.layers.Rescaling(255.0)(inputs)
+    x = keras.layers.Rescaling(255.0)(inputs)
     # Mode inference pour stabiliser les BatchNorm majoritairement gelées.
     x = base_model(x, training=False)
 
     # Head de classification
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(512, activation="relu", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(0.6)(x)
-    x = tf.keras.layers.Dense(256, activation="relu", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
-    logits = tf.keras.layers.Dense(num_classes)(x)
+    x = keras.layers.GlobalAveragePooling2D()(x)
+    x = keras.layers.Dense(512, activation="relu", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Dropout(0.6)(x)
+    x = keras.layers.Dense(256, activation="relu", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Dropout(0.5)(x)
+    logits = keras.layers.Dense(num_classes)(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
+    model = keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
     return model
 
 
 def ensemble_predict(
-    models: list[tf.keras.Model],
+    models: list[keras.Model],
     x_data: np.ndarray,
     weights: list[float] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -270,7 +271,7 @@ def sparse_focal_loss(gamma: float = 2.0, alpha: float = 0.25):
 
     def loss_fn(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         y_true = tf.cast(y_true, tf.int32)
-        ce = tf.keras.losses.sparse_categorical_crossentropy(
+        ce = keras.losses.sparse_categorical_crossentropy(
             y_true, y_pred, from_logits=True
         )
         probs = tf.nn.softmax(y_pred, axis=-1)
@@ -283,17 +284,17 @@ def sparse_focal_loss(gamma: float = 2.0, alpha: float = 0.25):
 
 
 def predict_with_tta(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_data: np.ndarray,
     tta_rounds: int = 5,
 ) -> np.ndarray:
     """Prédiction TTA en moyennant plusieurs vues augmentées d'une image."""
 
-    tta_aug = tf.keras.Sequential(
+    tta_aug = keras.Sequential(
         [
-            tf.keras.layers.RandomFlip("horizontal"),
-            tf.keras.layers.RandomRotation(0.04),
-            tf.keras.layers.RandomTranslation(0.04, 0.04),
+            keras.layers.RandomFlip("horizontal"),
+            keras.layers.RandomRotation(0.04),
+            keras.layers.RandomTranslation(0.04, 0.04),
         ]
     )
 
@@ -317,7 +318,7 @@ def run_cnn_sweep(
     sweep_trials: int,
     sweep_epochs: int,
     batch_size: int,
-) -> tuple[tf.keras.Model, dict[str, float | bool]]:
+) -> tuple[keras.Model, dict[str, float | bool]]:
     """Teste plusieurs configs CNN et retourne le meilleur modèle + sa config."""
 
     candidates = [
@@ -332,7 +333,7 @@ def run_cnn_sweep(
     ]
 
     trials = max(1, min(sweep_trials, len(candidates)))
-    best_model: tf.keras.Model | None = None
+    best_model: keras.Model | None = None
     best_val = -1.0
     best_cfg: dict[str, float | bool] | None = None
 
@@ -340,7 +341,7 @@ def run_cnn_sweep(
 
     for idx in range(trials):
         cfg = candidates[idx]
-        tf.keras.backend.clear_session()
+        keras.backend.clear_session()
 
         print(
             "  "
@@ -358,7 +359,7 @@ def run_cnn_sweep(
 
         if bool(cfg["focal"]):
             model.compile(
-                optimizer=tf.keras.optimizers.Adam(learning_rate=float(cfg["lr"])),
+                optimizer=keras.optimizers.Adam(learning_rate=float(cfg["lr"])),
                 loss=sparse_focal_loss(gamma=2.0, alpha=0.35),
                 metrics=["accuracy"],
             )
@@ -505,7 +506,7 @@ def main() -> None:
                     f"\n[{step}/{total_steps}] Final train CNN avec meilleure config "
                     f"({args.final_epochs} epochs)..."
                 )
-                tf.keras.backend.clear_session()
+                keras.backend.clear_session()
                 cnn_model = build_cnn_classifier(
                     x_train.shape[1:],
                     num_classes=4,
@@ -514,7 +515,7 @@ def main() -> None:
                 )
                 if bool(best_cfg["focal"]):
                     cnn_model.compile(
-                        optimizer=tf.keras.optimizers.Adam(
+                        optimizer=keras.optimizers.Adam(
                             learning_rate=float(best_cfg["lr"])
                         ),
                         loss=sparse_focal_loss(gamma=2.0, alpha=0.35),
@@ -542,7 +543,7 @@ def main() -> None:
             )
             if args.focal:
                 cnn_model.compile(
-                    optimizer=tf.keras.optimizers.Adam(learning_rate=7e-4),
+                    optimizer=keras.optimizers.Adam(learning_rate=7e-4),
                     loss=sparse_focal_loss(gamma=2.0, alpha=0.35),
                     metrics=["accuracy"],
                 )
@@ -583,7 +584,7 @@ def main() -> None:
             epochs=epochs,
             batch_size=batch_size,
             callbacks=[
-                tf.keras.callbacks.EarlyStopping(
+                keras.callbacks.EarlyStopping(
                     monitor="val_accuracy",
                     patience=10,
                     restore_best_weights=True,

@@ -5,7 +5,6 @@ de traitement pour chaque cas en fonction de la gravité clinique,
 du niveau de confiance, et des alertes de sécurité.
 """
 
-from typing import List, Dict
 from collections import Counter
 
 from src.decision.engine import ClinicalDecision
@@ -19,7 +18,7 @@ from src.config.thresholds import (
 
 
 def determiner_priorite(
-    decision: ClinicalDecision, gravites: Dict[str, int] = None
+    decision: ClinicalDecision, gravites: dict[str, int] = None
 ) -> str:
     """Détermine la priorité clinique d'un cas.
 
@@ -84,7 +83,7 @@ def determiner_priorite(
 
 
 def appliquer_triage(
-    decision: ClinicalDecision, gravites: Dict[str, int] = None
+    decision: ClinicalDecision, gravites: dict[str, int] = None
 ) -> ClinicalDecision:
     """Applique le triage et met à jour la priorité de la décision.
 
@@ -100,8 +99,8 @@ def appliquer_triage(
 
 
 def appliquer_triage_batch(
-    decisions: List[ClinicalDecision], gravites: Dict[str, int] = None
-) -> List[ClinicalDecision]:
+    decisions: list[ClinicalDecision], gravites: dict[str, int] = None
+) -> list[ClinicalDecision]:
     """Applique le triage sur un lot de décisions.
 
     Args:
@@ -114,7 +113,7 @@ def appliquer_triage_batch(
     return [appliquer_triage(d, gravites) for d in decisions]
 
 
-def trier_par_priorite(decisions: List[ClinicalDecision]) -> List[ClinicalDecision]:
+def trier_par_priorite(decisions: list[ClinicalDecision]) -> list[ClinicalDecision]:
     """Trie les décisions par ordre de priorité décroissante.
 
     Ordre: URGENTE > ELEVEE > NORMALE > ROUTINE
@@ -139,8 +138,8 @@ def trier_par_priorite(decisions: List[ClinicalDecision]) -> List[ClinicalDecisi
 
 
 def filtrer_par_priorite(
-    decisions: List[ClinicalDecision], priorites: List[str]
-) -> List[ClinicalDecision]:
+    decisions: list[ClinicalDecision], priorites: list[str]
+) -> list[ClinicalDecision]:
     """Filtre les décisions pour ne garder que certaines priorités.
 
     Args:
@@ -153,7 +152,7 @@ def filtrer_par_priorite(
     return [d for d in decisions if d.priorite in priorites]
 
 
-def statistiques_triage(decisions: List[ClinicalDecision]) -> dict:
+def statistiques_triage(decisions: list[ClinicalDecision]) -> dict:
     """Calcule des statistiques sur la distribution des priorités.
 
     Args:
@@ -189,8 +188,8 @@ def statistiques_triage(decisions: List[ClinicalDecision]) -> dict:
 
 
 def generer_file_attente(
-    decisions: List[ClinicalDecision],
-) -> Dict[str, List[ClinicalDecision]]:
+    decisions: list[ClinicalDecision],
+) -> dict[str, list[ClinicalDecision]]:
     """Génère des files d'attente par priorité pour le workflow clinique.
 
     Les décisions sont regroupées par niveau de priorité pour faciliter

@@ -1,10 +1,9 @@
 """Templates et helpers de sortie des rapports patients."""
 
 from datetime import datetime
-from typing import Dict
 
 
-CLASS_LABELS: Dict[str, str] = {
+CLASS_LABELS: dict[str, str] = {
     "glioma": "Gliome",
     "meningioma": "Meningiome",
     "pituitary": "Tumeur pituitaire",

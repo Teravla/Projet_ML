@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
+import keras
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
@@ -43,63 +44,63 @@ def build_improved_cnn(
     input_shape: tuple[int, int, int],
     num_classes: int = 4,
     learning_rate: float = 1e-4,
-) -> tf.keras.Model:
+) -> keras.Model:
     """CNN amélioré avec batch norm, skip connections, regularization."""
 
-    inputs = tf.keras.Input(shape=input_shape, name="image_input")
+    inputs = keras.Input(shape=input_shape, name="image_input")
 
     # Bloc 1: Conv + BatchNorm + Pool
-    x = tf.keras.layers.Conv2D(64, 3, padding="same", use_bias=False)(inputs)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Conv2D(64, 3, padding="same", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(0.25)(x)
+    x = keras.layers.Conv2D(64, 3, padding="same", use_bias=False)(inputs)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Conv2D(64, 3, padding="same", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(0.25)(x)
 
     # Bloc 2: Résiduel-like
-    residual = tf.keras.layers.Conv2D(128, 1, padding="same")(x)
-    x = tf.keras.layers.Conv2D(128, 3, padding="same", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Conv2D(128, 3, padding="same", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Add()([x, residual])
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(0.25)(x)
+    residual = keras.layers.Conv2D(128, 1, padding="same")(x)
+    x = keras.layers.Conv2D(128, 3, padding="same", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Conv2D(128, 3, padding="same", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Add()([x, residual])
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(0.25)(x)
 
     # Bloc 3
-    x = tf.keras.layers.Conv2D(256, 3, padding="same", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Conv2D(256, 3, padding="same", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.MaxPooling2D(pool_size=2)(x)
-    x = tf.keras.layers.Dropout(0.25)(x)
+    x = keras.layers.Conv2D(256, 3, padding="same", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Conv2D(256, 3, padding="same", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.MaxPooling2D(pool_size=2)(x)
+    x = keras.layers.Dropout(0.25)(x)
 
     # Global Average Pooling + Dense
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(512, use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
+    x = keras.layers.GlobalAveragePooling2D()(x)
+    x = keras.layers.Dense(512, use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Dropout(0.5)(x)
 
-    x = tf.keras.layers.Dense(256, use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Activation("relu")(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
+    x = keras.layers.Dense(256, use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Dropout(0.5)(x)
 
-    logits = tf.keras.layers.Dense(num_classes, name="logits")(x)
+    logits = keras.layers.Dense(num_classes, name="logits")(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=logits, name="improved_cnn")
+    model = keras.Model(inputs=inputs, outputs=logits, name="improved_cnn")
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
     return model
@@ -109,11 +110,11 @@ def build_transfer_learning_model(
     input_shape: tuple[int, int, int],
     num_classes: int = 4,
     learning_rate: float = 1e-4,
-) -> tf.keras.Model:
+) -> keras.Model:
     """Transfer learning avec EfficientNetB0."""
 
     # Charger EfficientNetB0 pré-entraîné
-    base_model = tf.keras.applications.EfficientNetB0(
+    base_model = keras.applications.EfficientNetB0(
         input_shape=input_shape,
         include_top=False,
         weights="imagenet",
@@ -123,66 +124,66 @@ def build_transfer_learning_model(
     for layer in base_model.layers[:-40]:
         layer.trainable = False
 
-    inputs = tf.keras.Input(shape=input_shape)
+    inputs = keras.Input(shape=input_shape)
 
     # Les images du pipeline sont en [0, 1]. EfficientNetB0 (Keras) est calibré
     # pour des entrées [0, 255], donc on remonte l'échelle avant le backbone.
-    x = tf.keras.layers.Rescaling(255.0)(inputs)
+    x = keras.layers.Rescaling(255.0)(inputs)
     # Mode inference pour stabiliser les BatchNorm majoritairement gelées.
     x = base_model(x, training=False)
 
     # Head de classification
-    x = tf.keras.layers.GlobalAveragePooling2D()(x)
-    x = tf.keras.layers.Dense(512, activation="relu", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(0.5)(x)
-    x = tf.keras.layers.Dense(256, activation="relu", use_bias=False)(x)
-    x = tf.keras.layers.BatchNormalization()(x)
-    x = tf.keras.layers.Dropout(0.3)(x)
-    logits = tf.keras.layers.Dense(num_classes)(x)
+    x = keras.layers.GlobalAveragePooling2D()(x)
+    x = keras.layers.Dense(512, activation="relu", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Dropout(0.5)(x)
+    x = keras.layers.Dense(256, activation="relu", use_bias=False)(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Dropout(0.3)(x)
+    logits = keras.layers.Dense(num_classes)(x)
 
-    model = tf.keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
+    model = keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=["accuracy"],
     )
     return model
 
 
 def train_model_with_augmentation(
-    model: tf.keras.Model,
+    model: keras.Model,
     x_train: np.ndarray,
     y_train: np.ndarray,
     x_val: np.ndarray,
     y_val: np.ndarray,
     epochs: int = 50,
     batch_size: int = 32,
-) -> tf.keras.callbacks.History:
+) -> keras.callbacks.History:
     """Entraîne avec data augmentation et learning rate scheduling."""
 
     # Data augmentation robuste
-    train_augmentation = tf.keras.Sequential(
+    train_augmentation = keras.Sequential(
         [
-            tf.keras.layers.RandomFlip("horizontal"),
-            tf.keras.layers.RandomFlip("vertical"),
-            tf.keras.layers.RandomRotation(0.2),
-            tf.keras.layers.RandomZoom(0.2),
-            tf.keras.layers.RandomTranslation(0.1, 0.1),
+            keras.layers.RandomFlip("horizontal"),
+            keras.layers.RandomFlip("vertical"),
+            keras.layers.RandomRotation(0.2),
+            keras.layers.RandomZoom(0.2),
+            keras.layers.RandomTranslation(0.1, 0.1),
         ]
     )
 
     # Callbacks
     callbacks = [
-        tf.keras.callbacks.EarlyStopping(
+        keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
             patience=10,
             restore_best_weights=True,
             mode="max",
         ),
-        tf.keras.callbacks.ReduceLROnPlateau(
+        keras.callbacks.ReduceLROnPlateau(
             monitor="val_loss",
             factor=0.5,
             patience=5,
@@ -207,7 +208,7 @@ def train_model_with_augmentation(
 
 
 def ensemble_predict(
-    models: list[tf.keras.Model],
+    models: list[keras.Model],
     x_data: np.ndarray,
     weights: list[float] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:

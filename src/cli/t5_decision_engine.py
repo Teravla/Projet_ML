@@ -14,6 +14,7 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
+import keras
 import numpy as np
 from datetime import datetime
 
@@ -24,7 +25,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from src.data.loader import load_dataset_split, discover_classes, DatasetSplit
 from src.data.preprocess import preprocess_dataset
 from src.decision.engine import (
-    generer_decision_clinique,
     traiter_batch_decisions,
     statistiques_decisions,
 )
@@ -114,10 +114,10 @@ def charger_modele(model_type: str, input_shape, num_classes: int):
 
     if model_type == "logreg":
         # Simuler un modèle logistique simple
-        model = tf.keras.Sequential(
+        model = keras.Sequential(
             [
-                tf.keras.layers.Flatten(input_shape=input_shape),
-                tf.keras.layers.Dense(num_classes, activation="softmax"),
+                keras.layers.Flatten(input_shape=input_shape),
+                keras.layers.Dense(num_classes, activation="softmax"),
             ]
         )
         model.compile(
@@ -126,14 +126,14 @@ def charger_modele(model_type: str, input_shape, num_classes: int):
     elif model_type == "mlp":
         # MLP prend input_dim (flattened), pas input_shape
         input_dim = np.prod(input_shape)
-        model = tf.keras.Sequential(
+        model = keras.Sequential(
             [
-                tf.keras.layers.Flatten(input_shape=input_shape),
-                tf.keras.layers.Dense(256, activation="relu"),
-                tf.keras.layers.Dropout(0.3),
-                tf.keras.layers.Dense(128, activation="relu"),
-                tf.keras.layers.Dropout(0.3),
-                tf.keras.layers.Dense(num_classes, activation="softmax"),
+                keras.layers.Flatten(input_shape=input_shape),
+                keras.layers.Dense(256, activation="relu"),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(128, activation="relu"),
+                keras.layers.Dropout(0.3),
+                keras.layers.Dense(num_classes, activation="softmax"),
             ]
         )
         model.compile(
@@ -151,8 +151,8 @@ def charger_modele(model_type: str, input_shape, num_classes: int):
         # Créer un modèle avec softmax sur les logits
         inputs = model_logits.input
         logits = model_logits.output
-        probs = tf.keras.layers.Softmax(name="probs")(logits)
-        model = tf.keras.Model(inputs=inputs, outputs=probs, name="cnn_with_softmax")
+        probs = keras.layers.Softmax(name="probs")(logits)
+        model = keras.Model(inputs=inputs, outputs=probs, name="cnn_with_softmax")
 
         model.compile(
             optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"]
