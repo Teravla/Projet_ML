@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
-
 import numpy as np
 from sklearn.metrics import accuracy_score
-from sklearn.model_selection import train_test_split
-from src.data.loader import load_dataset_split
-from src.data.preprocess import preprocess_dataset
+from src.data.pipeline import (
+    TrainValTestData,
+    load_preprocessed_train_test,
+    split_train_validation,
+)
 from src.models.log_reg import flatten_images
 from src.models.mlp import (
+    MLPTrainingConfig,
+    MLPTrainingData,
     build_mlp_classifier,
     predict_probabilities,
     train_mlp_classifier,
@@ -32,16 +34,7 @@ class RuntimeConfig:
     mode: str
 
 
-@dataclass(frozen=True)
-class DataBundle:
-    """Jeu de données prêt pour entraînement/évaluation MLP."""
-
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
+DataBundle = TrainValTestData
 
 
 @dataclass(frozen=True)
@@ -105,26 +98,11 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
 
 def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
     """Charge et prépare les données pour la tâche 3."""
-    train_dir = Path(data_dir) / "Training"
-    test_dir = Path(data_dir) / "Testing"
     image_size = (runtime.img_size, runtime.img_size)
 
-    train_split = load_dataset_split(train_dir, image_size=image_size)
-    test_split = load_dataset_split(
-        test_dir, image_size=image_size, class_names=train_split.class_names
-    )
-
-    x_train_all, y_train_all = preprocess_dataset(
-        train_split.images,
-        train_split.labels,
-        target_size=image_size,
-        normalize=True,
-        one_hot=False,
-    )
-    x_test, y_test = preprocess_dataset(
-        test_split.images,
-        test_split.labels,
-        target_size=image_size,
+    _, x_train_all, y_train_all, x_test, y_test = load_preprocessed_train_test(
+        data_dir=data_dir,
+        image_size=image_size,
         normalize=True,
         one_hot=False,
     )
@@ -132,22 +110,9 @@ def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
     x_train_all = flatten_images(x_train_all)
     x_test = flatten_images(x_test)
 
-    x_train, x_val, y_train, y_val = train_test_split(
-        x_train_all,
-        y_train_all,
-        test_size=0.2,
-        random_state=42,
-        stratify=y_train_all,
-    )
+    x_train, x_val, y_train, y_val = split_train_validation(x_train_all, y_train_all)
 
-    return DataBundle(
-        x_train=x_train,
-        x_val=x_val,
-        y_train=y_train,
-        y_val=y_val,
-        x_test=x_test,
-        y_test=y_test,
-    )
+    return DataBundle(x_train, x_val, y_train, y_val, x_test, y_test)
 
 
 def train_and_evaluate(
@@ -164,15 +129,24 @@ def train_and_evaluate(
         learning_rate=args.learning_rate,
     )
 
-    train_mlp_classifier(
-        model=model,
+    training_data = MLPTrainingData(
         x_train=data.x_train,
         y_train=data.y_train,
         x_val=data.x_val,
         y_val=data.y_val,
+    )
+    training_config = MLPTrainingConfig(
         epochs=runtime.epochs,
         batch_size=runtime.batch_size,
+        learning_rate=args.learning_rate,
+        dropout_rate=args.dropout_rate,
+        hidden_units=runtime.hidden_units,
         verbose=1,
+    )
+    train_mlp_classifier(
+        model=model,
+        training_data=training_data,
+        training_config=training_config,
     )
 
     deterministic_probs = predict_probabilities(model, data.x_test)

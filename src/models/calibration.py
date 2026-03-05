@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import keras
 import numpy as np
 import tensorflow as tf
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
+from src.models.utils import summarize_uncertainty_ratio
+
+
+@dataclass(frozen=True)
+class TemperatureFitConfig:
+    """Configuration d'optimisation pour le temperature scaling."""
+
+    learning_rate: float = 1e-2
+    epochs: int = 300
+    verbose: int = 0
 
 
 def calibrate_classifier(
@@ -40,16 +52,7 @@ def analyze_uncertain_predictions(
 ) -> dict[str, float]:
     """Calcule la part de prédictions incertaines pour un seuil donné."""
 
-    uncertain_mask = max_probabilities < threshold
-    uncertain_count = int(np.sum(uncertain_mask))
-    total = int(max_probabilities.shape[0])
-    uncertain_ratio = float(uncertain_count / total) if total else 0.0
-    return {
-        "threshold": float(threshold),
-        "uncertain_count": uncertain_count,
-        "total": total,
-        "uncertain_ratio": uncertain_ratio,
-    }
+    return summarize_uncertainty_ratio(max_probabilities, threshold)
 
 
 class TemperatureScaler:
@@ -66,38 +69,58 @@ class TemperatureScaler:
 
     @property
     def temperature(self) -> float:
+        """Retourne la température scalaire courante."""
         return float(tf.exp(self._log_temperature).numpy())
+
+    def _train_step(
+        self,
+        logits_tf: tf.Tensor,
+        labels_tf: tf.Tensor,
+        optimizer: keras.optimizers.Optimizer,
+        loss_fn: keras.losses.Loss,
+    ) -> tf.Tensor:
+        """Exécute une étape d'optimisation de la température."""
+        with tf.GradientTape() as tape:
+            temperature = tf.exp(self._log_temperature)
+            scaled_logits = logits_tf / temperature
+            loss = loss_fn(labels_tf, scaled_logits)
+
+        grads = tape.gradient(loss, [self._log_temperature])
+        optimizer.apply_gradients(zip(grads, [self._log_temperature]))
+        return loss
 
     def fit(
         self,
         logits: np.ndarray,
         labels: np.ndarray,
-        learning_rate: float = 1e-2,
-        epochs: int = 300,
-        verbose: int = 0,
+        config: TemperatureFitConfig | None = None,
+        **kwargs,
     ) -> None:
         """Ajuste la température en minimisant la NLL sur un set de calibration."""
 
-        if epochs <= 0:
+        if config is None:
+            config = TemperatureFitConfig(
+                learning_rate=float(kwargs.pop("learning_rate", 1e-2)),
+                epochs=int(kwargs.pop("epochs", 300)),
+                verbose=int(kwargs.pop("verbose", 0)),
+            )
+        if kwargs:
+            unknown = ", ".join(sorted(kwargs.keys()))
+            raise TypeError(f"Unexpected keyword arguments: {unknown}")
+
+        if config.epochs <= 0:
             raise ValueError("epochs doit être > 0")
 
         logits_tf = tf.convert_to_tensor(logits, dtype=tf.float32)
         labels_tf = tf.convert_to_tensor(labels, dtype=tf.int32)
-        optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
+        optimizer = keras.optimizers.Adam(learning_rate=config.learning_rate)
         loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
 
-        for step in range(epochs):
-            with tf.GradientTape() as tape:
-                temperature = tf.exp(self._log_temperature)
-                scaled_logits = logits_tf / temperature
-                loss = loss_fn(labels_tf, scaled_logits)
-
-            grads = tape.gradient(loss, [self._log_temperature])
-            optimizer.apply_gradients(zip(grads, [self._log_temperature]))
-
-            if verbose and (step + 1) % 50 == 0:
+        for step in range(config.epochs):
+            loss = self._train_step(logits_tf, labels_tf, optimizer, loss_fn)
+            if config.verbose and (step + 1) % 50 == 0:
                 print(
-                    f"Temperature scaling step={step + 1}/{epochs} "
+                    f"Temperature scaling step={step + 1}/{config.epochs} "
                     f"loss={float(loss.numpy()):.4f} T={self.temperature:.4f}"
                 )
 

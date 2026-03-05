@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import keras
 import numpy as np
 import tensorflow as tf
+from src.models.utils import summarize_uncertainty_ratio
 
 
 @dataclass(frozen=True)
@@ -58,13 +59,4 @@ def summarize_uncertainty(
 ) -> dict[str, float]:
     """Résume le taux de prédictions considérées incertaines."""
 
-    uncertain_mask = max_probabilities < threshold
-    uncertain_count = int(np.sum(uncertain_mask))
-    total = int(max_probabilities.shape[0])
-    uncertain_ratio = float(uncertain_count / total) if total else 0.0
-    return {
-        "threshold": float(threshold),
-        "uncertain_count": uncertain_count,
-        "total": total,
-        "uncertain_ratio": uncertain_ratio,
-    }
+    return summarize_uncertainty_ratio(max_probabilities, threshold)

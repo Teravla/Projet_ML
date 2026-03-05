@@ -18,7 +18,7 @@ import keras
 import numpy as np
 from reportlab.pdfgen import canvas
 from flask import Flask, jsonify, request, make_response
-from src.decision.engine import generer_recommandation
+from src.decision.engine import count_confidence_levels, generer_recommandation
 from src.decision.rules import appliquer_regle_securite_negatif
 from src.decision.triage import appliquer_triage
 from src.evaluation.analysis import analyser_performance_sad
@@ -374,12 +374,11 @@ def api_stats():
     decisions, _ = get_or_generate_decisions(n_cases=120)
 
     n_total = len(decisions)
-    n_haute = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_HAUTE)
-    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_MOYENNE)
-    n_faible = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_FAIBLE)
-    n_tres_faible = sum(
-        1 for d in decisions if d.niveau_confiance == CONFIDENCE_TRES_FAIBLE
-    )
+    confidence_counts = count_confidence_levels(decisions)
+    n_haute = confidence_counts[CONFIDENCE_HAUTE]
+    n_moyenne = confidence_counts[CONFIDENCE_MOYENNE]
+    n_faible = confidence_counts[CONFIDENCE_FAIBLE]
+    n_tres_faible = confidence_counts[CONFIDENCE_TRES_FAIBLE]
 
     n_urgente = sum(1 for d in decisions if PRIORITY_URGENTE in d.priorite)
     n_elevee = sum(

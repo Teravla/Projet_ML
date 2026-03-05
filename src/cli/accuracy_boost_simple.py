@@ -8,11 +8,15 @@ from pathlib import Path
 
 import keras
 import numpy as np
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import tensorflow as tf
 
-from src.data.loader import load_dataset_split
+from src.cli.accuracy_boost import (
+    PreparedData,
+    prepare_data as prepare_data_common,
+    print_classification_summary,
+)
+from src.models.utils import compile_logits_classifier
 from src.models.cnn import build_cnn_classifier
 from src.models.mlp import build_mlp_classifier
 
@@ -58,19 +62,6 @@ class AppConfig:
     use_tta: bool
     use_focal: bool
     active_models: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class DataBundle:
-    """Données pretes pour le pipeline."""
-
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
-    class_names: list[str]
 
 
 @dataclass(frozen=True)
@@ -178,9 +169,10 @@ def build_transfer_learning_model(
         layer.trainable = False
 
     inputs = keras.Input(shape=input_shape)
-    x = keras.layers.Rescaling(255.0)(inputs)
-    x = base_model(x, training=False)
-    x = keras.layers.GlobalAveragePooling2D()(x)
+    preprocess_layer = keras.layers.Rescaling(255.0, name="efficientnet_rescale")
+    preprocessed_inputs = preprocess_layer(inputs)
+    features = base_model(preprocessed_inputs, training=False)
+    x = keras.layers.GlobalAveragePooling2D()(features)
     x = keras.layers.Dense(512, activation="relu", use_bias=False)(x)
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Dropout(0.6)(x)
@@ -190,11 +182,7 @@ def build_transfer_learning_model(
     logits = keras.layers.Dense(num_classes)(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=["accuracy"],
-    )
+    compile_logits_classifier(model, learning_rate=learning_rate)
     return model
 
 
@@ -240,6 +228,20 @@ def train_model_with_augmentation(
         ]
     )
 
+    reduce_lr = keras.callbacks.ReduceLROnPlateau(
+        monitor="val_loss",
+        factor=0.5,
+        patience=8,
+        min_lr=1e-7,
+        verbose=1,
+    )
+    checkpoint_best = keras.callbacks.ModelCheckpoint(
+        filepath="artifacts/models/best_cnn_checkpoint.keras",
+        monitor="val_accuracy",
+        save_best_only=True,
+        mode="max",
+        verbose=0,
+    )
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
@@ -247,20 +249,8 @@ def train_model_with_augmentation(
             restore_best_weights=True,
             mode="max",
         ),
-        keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss",
-            factor=0.5,
-            patience=8,
-            min_lr=1e-7,
-            verbose=1,
-        ),
-        keras.callbacks.ModelCheckpoint(
-            filepath="artifacts/models/best_cnn_checkpoint.keras",
-            monitor="val_accuracy",
-            save_best_only=True,
-            mode="max",
-            verbose=0,
-        ),
+        reduce_lr,
+        checkpoint_best,
     ]
 
     base_ds = (
@@ -306,53 +296,14 @@ def predict_with_tta(
     return logits_acc / (tta_rounds + 1)
 
 
-def encode_labels(labels: np.ndarray, class_names: list[str]) -> np.ndarray:
-    """Convertit des labels int/str en indices int64."""
-
-    return (
-        np.array(labels, dtype=np.int64)
-        if isinstance(labels[0], (int, np.integer))
-        else np.array([class_names.index(label) for label in labels], dtype=np.int64)
-    )
-
-
-def prepare_data(img_size: tuple[int, int]) -> DataBundle:
+def prepare_data(img_size: tuple[int, int]) -> PreparedData:
     """Charge les splits et prepare train/val/test."""
 
-    data_dir = Path("data")
-    train_split = load_dataset_split(data_dir / "Training", image_size=img_size)
-    test_split = load_dataset_split(
-        data_dir / "Testing",
-        image_size=img_size,
-        class_names=train_split.class_names,
-    )
-
-    x_train_all = train_split.images.astype(np.float32) / 255.0
-    y_train_all = encode_labels(train_split.labels, train_split.class_names)
-    x_test = test_split.images.astype(np.float32) / 255.0
-    y_test = encode_labels(test_split.labels, test_split.class_names)
-
-    x_train, x_val, y_train, y_val = train_test_split(
-        x_train_all,
-        y_train_all,
-        test_size=0.2,
-        random_state=42,
-        stratify=y_train_all,
-    )
-
-    return DataBundle(
-        x_train=x_train,
-        x_val=x_val,
-        y_train=y_train,
-        y_val=y_val,
-        x_test=x_test,
-        y_test=y_test,
-        class_names=train_split.class_names,
-    )
+    return prepare_data_common(Path("data"), img_size)
 
 
 def run_cnn_sweep(
-    data: DataBundle,
+    data: PreparedData,
     sweep_cfg: SweepConfig,
 ) -> tuple[keras.Model, dict[str, float | bool]]:
     """Teste plusieurs configs CNN et retourne le meilleur modele."""
@@ -435,7 +386,7 @@ def run_cnn_sweep(
 
 
 def train_cnn_pipeline(
-    data: DataBundle,
+    data: PreparedData,
     app_cfg: AppConfig,
     train_cfg: TrainConfig,
     sweep_cfg: SweepConfig,
@@ -499,7 +450,7 @@ def train_cnn_pipeline(
     return cnn_model
 
 
-def train_mlp_pipeline(data: DataBundle, train_cfg: TrainConfig) -> keras.Model:
+def train_mlp_pipeline(data: PreparedData, train_cfg: TrainConfig) -> keras.Model:
     """Entraine le MLP sur images flatten."""
 
     x_train_flat = data.x_train.reshape(data.x_train.shape[0], -1)
@@ -510,40 +461,42 @@ def train_mlp_pipeline(data: DataBundle, train_cfg: TrainConfig) -> keras.Model:
         num_classes=NUM_CLASSES,
         dropout_rate=0.4,
     )
+    early_stopping = keras.callbacks.EarlyStopping(
+        monitor="val_accuracy",
+        patience=10,
+        restore_best_weights=True,
+        mode="max",
+    )
     mlp_model.fit(
         x_train_flat,
         data.y_train,
         validation_data=(x_val_flat, data.y_val),
         epochs=train_cfg.epochs,
         batch_size=train_cfg.batch_size,
-        callbacks=[
-            keras.callbacks.EarlyStopping(
-                monitor="val_accuracy",
-                patience=10,
-                restore_best_weights=True,
-                mode="max",
-            ),
-        ],
+        callbacks=[early_stopping],
         verbose=1,
     )
     return mlp_model
 
 
 def train_transfer_pipeline(
-    data: DataBundle, train_cfg: TrainConfig
+    data: PreparedData, train_cfg: TrainConfig
 ) -> keras.Model | None:
     """Entraine le modele transfer learning, retourne None en cas d'echec."""
 
+    transfer_config = TrainConfig(
+        epochs=min(50, train_cfg.epochs),
+        batch_size=train_cfg.batch_size,
+    )
+    train_data = (data.x_train, data.y_train)
+    validation_data = (data.x_val, data.y_val)
     model_transfer = build_transfer_learning_model(data.x_train.shape[1:])
     try:
         train_model_with_augmentation(
             model=model_transfer,
-            train_data=(data.x_train, data.y_train),
-            validation_data=(data.x_val, data.y_val),
-            config=TrainConfig(
-                epochs=min(50, train_cfg.epochs),
-                batch_size=train_cfg.batch_size,
-            ),
+            train_data=train_data,
+            validation_data=validation_data,
+            config=transfer_config,
             use_augmentation=True,
         )
         return model_transfer
@@ -570,7 +523,7 @@ def predict_logits(
 
 def evaluate_models(
     models: dict[str, keras.Model],
-    data: DataBundle,
+    data: PreparedData,
     use_tta: bool,
     use_ensemble: bool,
 ) -> EvalBundle:
@@ -671,20 +624,14 @@ def save_models(models: dict[str, keras.Model]) -> None:
     print(f"\n  Tous les modeles sauvegardes dans {artifacts_dir}")
 
 
-def print_summary(data: DataBundle, eval_bundle: EvalBundle) -> None:
+def print_summary(data: PreparedData, eval_bundle: EvalBundle) -> None:
     """Affiche rapport final et metriques detaillees."""
 
     print_goal(eval_bundle.final_accuracy)
-    print("\n" + "=" * 70)
-    print("RAPPORT DE CLASSIFICATION")
-    print("=" * 70)
-    print(
-        classification_report(
-            data.y_test,
-            eval_bundle.y_pred_final,
-            target_names=data.class_names,
-            digits=4,
-        )
+    print_classification_summary(
+        data.y_test,
+        eval_bundle.y_pred_final,
+        data.class_names,
     )
 
 
@@ -737,7 +684,7 @@ def print_runtime_config(
 
 def train_selected_models(
     app_cfg: AppConfig,
-    data: DataBundle,
+    data: PreparedData,
     train_cfg: TrainConfig,
     sweep_cfg: SweepConfig,
 ) -> dict[str, keras.Model]:

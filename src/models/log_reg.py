@@ -9,6 +9,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report
 
 
+MIN_IMAGE_NDIM = 2
+
+
 @dataclass(frozen=True)
 class PredictionSummary:
     """Résumé des prédictions probabilistes."""
@@ -21,7 +24,7 @@ class PredictionSummary:
 def flatten_images(images: np.ndarray) -> np.ndarray:
     """Aplati un batch d'images (N,H,W,C) vers (N,F)."""
 
-    if images.ndim < 2:
+    if images.ndim < MIN_IMAGE_NDIM:
         raise ValueError("Le tenseur images est invalide")
     return images.reshape(images.shape[0], -1)
 

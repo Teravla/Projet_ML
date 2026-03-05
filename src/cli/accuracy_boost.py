@@ -17,10 +17,14 @@ from pathlib import Path
 import keras
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report
-from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
-from src.data.loader import load_dataset_split
+from src.data.pipeline import (
+    TrainValTestData,
+    load_train_test_splits,
+    split_train_validation,
+)
+from src.models.utils import compile_logits_classifier
 
 TARGET_ACCURACY = 0.90
 BASELINE_ACCURACY_PERCENT = 28.33
@@ -36,15 +40,9 @@ class TrainingConfig:
 
 
 @dataclass(frozen=True)
-class PreparedData:
+class PreparedData(TrainValTestData):
     """Données préparées pour l'entraînement et l'évaluation."""
 
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
     class_names: list[str]
 
 
@@ -125,12 +123,7 @@ def build_improved_cnn(
     logits = keras.layers.Dense(num_classes, name="logits")(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="improved_cnn")
-    optimizer = keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
-    model.compile(
-        optimizer=optimizer,
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=["accuracy"],
-    )
+    compile_logits_classifier(model, learning_rate=learning_rate, clipnorm=1.0)
     return model
 
 
@@ -164,12 +157,7 @@ def build_transfer_learning_model(
     logits = keras.layers.Dense(num_classes)(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
-    optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
-    model.compile(
-        optimizer=optimizer,
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=["accuracy"],
-    )
+    compile_logits_classifier(model, learning_rate=learning_rate)
     return model
 
 
@@ -255,25 +243,14 @@ def encode_labels(labels: np.ndarray, class_names: list[str]) -> np.ndarray:
 def prepare_data(data_dir: Path, img_size: tuple[int, int]) -> PreparedData:
     """Charge, normalise et découpe les données train/validation/test."""
 
-    train_split = load_dataset_split(data_dir / "Training", image_size=img_size)
-    test_split = load_dataset_split(
-        data_dir / "Testing",
-        image_size=img_size,
-        class_names=train_split.class_names,
-    )
+    train_split, test_split = load_train_test_splits(data_dir, img_size)
 
     x_train_all = train_split.images.astype(np.float32) / 255.0
     y_train_all = encode_labels(train_split.labels, train_split.class_names)
     x_test = test_split.images.astype(np.float32) / 255.0
     y_test = encode_labels(test_split.labels, test_split.class_names)
 
-    x_train, x_val, y_train, y_val = train_test_split(
-        x_train_all,
-        y_train_all,
-        test_size=0.2,
-        random_state=42,
-        stratify=y_train_all,
-    )
+    x_train, x_val, y_train, y_val = split_train_validation(x_train_all, y_train_all)
 
     return PreparedData(
         x_train=x_train,

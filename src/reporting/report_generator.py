@@ -11,6 +11,10 @@ from src.reporting.templates import (
 )
 
 
+CLASS_GLIOMA = "glioma"
+SECTION_SEPARATOR = "---"
+
+
 def creer_rapport_decision(
     patient_id: str, prediction: ClinicalDecision, confiance: float
 ) -> str:
@@ -33,13 +37,17 @@ def creer_rapport_decision(
         f"Patient ID: {patient_id} Date: {format_date_fr()}",
         "",
         "PREDICTION PRINCIPALE",
-        "---",
+        SECTION_SEPARATOR,
         f"Classe: {to_clinical_label(prediction.classe_predite)}",
         f"Confiance: {confiance:.1%}",
-        f"Niveau de certitude: {prediction.niveau_confiance} [{certitude_flag(prediction.niveau_confiance)}]",
+        (
+            "Niveau de certitude: "
+            f"{prediction.niveau_confiance} "
+            f"[{certitude_flag(prediction.niveau_confiance)}]"
+        ),
         "",
         "SCORES PAR CLASSE",
-        "---",
+        SECTION_SEPARATOR,
     ]
 
     for classe, proba in scores:
@@ -49,7 +57,7 @@ def creer_rapport_decision(
         [
             "",
             "RECOMMANDATIONS CLINIQUES",
-            "---",
+            SECTION_SEPARATOR,
             f"Diagnostic: {prediction.decision}",
             f"Action: {prediction.action_recommandee}",
             f"Priorite: {priorite_badge(prediction.priorite)}",
@@ -60,21 +68,21 @@ def creer_rapport_decision(
             ),
             "",
             "ELEMENTS D'ATTENTION",
-            "---",
+            SECTION_SEPARATOR,
         ]
     )
 
     if prediction.alerte_securite:
         lines.append("- Verification obligatoire (risque faux negatif)")
 
-    if prediction.classe_predite.lower() == "glioma":
+    if prediction.classe_predite.lower() == CLASS_GLIOMA:
         lines.append("- Tumeur maligne suspectee")
         lines.append("- IRM de controle recommandee")
 
     if prediction.niveau_confiance in {"FAIBLE", "TRES_FAIBLE"}:
         lines.append("- Cas incertain: relecture senior prioritaire")
 
-    if lines[-1] == "---":
+    if lines[-1] == SECTION_SEPARATOR:
         lines.append("- Aucun element critique additionnel")
 
     lines.append("========================================")

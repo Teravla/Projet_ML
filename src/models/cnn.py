@@ -7,6 +7,11 @@ from dataclasses import dataclass
 import numpy as np
 import keras
 import tensorflow as tf
+from src.models.utils import (
+    EarlyStoppingFitConfig,
+    compile_logits_classifier,
+    train_with_early_stopping,
+)
 
 
 @dataclass(frozen=True)
@@ -46,11 +51,7 @@ def build_cnn_classifier(
     logits = keras.layers.Dense(num_classes, name="logits")(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="cnn_logits")
-    model.compile(
-        optimizer=keras.optimizers.Adam(learning_rate=learning_rate),
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=["accuracy"],
-    )
+    compile_logits_classifier(model, learning_rate=learning_rate)
     return model
 
 
@@ -67,21 +68,17 @@ def train_cnn_classifier(
     x_val, y_val = validation_data
     config = training_config or CNNTrainingConfig()
 
-    callbacks = [
-        keras.callbacks.EarlyStopping(
+    return train_with_early_stopping(
+        model=model,
+        train_data=(x_train, y_train),
+        validation_data=(x_val, y_val),
+        config=EarlyStoppingFitConfig(
+            epochs=config.epochs,
+            batch_size=config.batch_size,
+            verbose=verbose,
             monitor="val_loss",
             patience=3,
-            restore_best_weights=True,
-        )
-    ]
-    return model.fit(
-        x_train,
-        y_train,
-        validation_data=(x_val, y_val),
-        epochs=config.epochs,
-        batch_size=config.batch_size,
-        callbacks=callbacks,
-        verbose=verbose,
+        ),
     )
 
 
@@ -158,12 +155,7 @@ def build_cnn_optimized(
     model = keras.Model(inputs=inputs, outputs=logits, name="cnn_optimized")
 
     # Optimizer avec gradient clipping pour stabilité
-    optimizer = keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
-    model.compile(
-        optimizer=optimizer,
-        loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-        metrics=["accuracy"],
-    )
+    compile_logits_classifier(model, learning_rate=learning_rate, clipnorm=1.0)
     return model
 
 

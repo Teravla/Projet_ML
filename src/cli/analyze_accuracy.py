@@ -14,7 +14,7 @@ import keras
 import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
-from src.data.loader import load_dataset_split
+from src.data.pipeline import load_train_test_splits
 from src.models.cnn import build_cnn_classifier
 
 # Thresholds and constants
@@ -159,12 +159,7 @@ def load_and_prepare_data() -> (
     data_dir = Path("data")
     img_size = (64, 64)
 
-    train_split = load_dataset_split(data_dir / "Training", image_size=img_size)
-    test_split = load_dataset_split(
-        data_dir / "Testing",
-        image_size=img_size,
-        class_names=train_split.class_names,
-    )
+    train_split, test_split = load_train_test_splits(data_dir, img_size)
 
     x_train = train_split.images.astype(np.float32) / 255.0
     y_train_raw = train_split.labels

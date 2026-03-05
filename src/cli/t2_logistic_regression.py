@@ -4,14 +4,10 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
-
 import numpy as np
 from sklearn.metrics import accuracy_score
 
-
-from src.data.loader import load_dataset_split
-from src.data.preprocess import preprocess_dataset
+from src.data.pipeline import load_preprocessed_train_test
 from src.models.calibration import (
     analyze_uncertain_predictions,
     calibrate_classifier,
@@ -88,26 +84,11 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
 
 def load_dataset_bundle(data_dir: str, runtime: RuntimeConfig) -> DatasetBundle:
     """Charge et preprocess les données train/test."""
-    train_dir = Path(data_dir) / "Training"
-    test_dir = Path(data_dir) / "Testing"
     image_size = (runtime.img_size, runtime.img_size)
 
-    train_split = load_dataset_split(train_dir, image_size=image_size)
-    test_split = load_dataset_split(
-        test_dir, image_size=image_size, class_names=train_split.class_names
-    )
-
-    x_train, y_train = preprocess_dataset(
-        train_split.images,
-        train_split.labels,
-        target_size=image_size,
-        normalize=True,
-        one_hot=False,
-    )
-    x_test, y_test = preprocess_dataset(
-        test_split.images,
-        test_split.labels,
-        target_size=image_size,
+    train_split, x_train, y_train, x_test, y_test = load_preprocessed_train_test(
+        data_dir=data_dir,
+        image_size=image_size,
         normalize=True,
         one_hot=False,
     )

@@ -19,6 +19,25 @@ CONFIDENCE_FAIBLE = "FAIBLE"
 CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
 
 
+def count_confidence_levels(decisions: list["ClinicalDecision"]) -> dict[str, int]:
+    """Compte le nombre de décisions par niveau de confiance."""
+
+    return {
+        CONFIDENCE_HAUTE: sum(
+            1 for d in decisions if d.niveau_confiance == CONFIDENCE_HAUTE
+        ),
+        CONFIDENCE_MOYENNE: sum(
+            1 for d in decisions if d.niveau_confiance == CONFIDENCE_MOYENNE
+        ),
+        CONFIDENCE_FAIBLE: sum(
+            1 for d in decisions if d.niveau_confiance == CONFIDENCE_FAIBLE
+        ),
+        CONFIDENCE_TRES_FAIBLE: sum(
+            1 for d in decisions if d.niveau_confiance == CONFIDENCE_TRES_FAIBLE
+        ),
+    }
+
+
 @dataclass
 class DecisionWorkflow:
     """Informations workflow et sécurité associées à une décision."""
@@ -278,12 +297,7 @@ def statistiques_decisions(decisions: list[ClinicalDecision]) -> dict[str, float
     if n_total == 0:
         return {}
 
-    n_haute = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_HAUTE)
-    n_moyenne = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_MOYENNE)
-    n_faible = sum(1 for d in decisions if d.niveau_confiance == CONFIDENCE_FAIBLE)
-    n_tres_faible = sum(
-        1 for d in decisions if d.niveau_confiance == CONFIDENCE_TRES_FAIBLE
-    )
+    confidence_counts = count_confidence_levels(decisions)
 
     n_revisions = sum(1 for d in decisions if d.revision_requise)
     n_alertes = sum(1 for d in decisions if d.alerte_securite)
@@ -292,10 +306,11 @@ def statistiques_decisions(decisions: list[ClinicalDecision]) -> dict[str, float
 
     return {
         "n_total": n_total,
-        "taux_haute_confiance": n_haute / n_total,
-        "taux_moyenne_confiance": n_moyenne / n_total,
-        "taux_faible_confiance": n_faible / n_total,
-        "taux_tres_faible_confiance": n_tres_faible / n_total,
+        "taux_haute_confiance": confidence_counts[CONFIDENCE_HAUTE] / n_total,
+        "taux_moyenne_confiance": confidence_counts[CONFIDENCE_MOYENNE] / n_total,
+        "taux_faible_confiance": confidence_counts[CONFIDENCE_FAIBLE] / n_total,
+        "taux_tres_faible_confiance": confidence_counts[CONFIDENCE_TRES_FAIBLE]
+        / n_total,
         "taux_revision_requise": n_revisions / n_total,
         "taux_alertes_securite": n_alertes / n_total,
         "confiance_moyenne": np.mean(confiances),

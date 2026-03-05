@@ -10,6 +10,12 @@ CLASS_LABELS: dict[str, str] = {
     "notumor": "Pas de tumeur",
 }
 
+CONFIDENCE_HAUTE = "HAUTE"
+PRIORITY_URGENTE = "URGENTE"
+PRIORITY_ELEVEE = "ELEVEE"
+ACCENTED_E = "É"
+UNACCENTED_E = "E"
+
 
 def format_date_fr() -> str:
     """Retourne la date courante au format JJ/MM/AAAA."""
@@ -26,13 +32,16 @@ def to_clinical_label(class_name: str) -> str:
 
 def certitude_flag(niveau_confiance: str) -> str:
     """Retourne le drapeau de certitude du rapport."""
-    return "OK" if niveau_confiance == "HAUTE" else "A_VERIFIER"
+    return "OK" if niveau_confiance == CONFIDENCE_HAUTE else "A_VERIFIER"
 
 
 def priorite_badge(priorite: str) -> str:
     """Ajoute un prefixe visuel a la priorite dans le rapport."""
-    if "URGENTE" in priorite.upper():
+    normalized = priorite.upper()
+    if PRIORITY_URGENTE in normalized:
         return f"[!] {priorite}"
-    if "ELEVEE" in priorite.upper() or "ELEVEE" in priorite.upper().replace("É", "E"):
+    if PRIORITY_ELEVEE in normalized or PRIORITY_ELEVEE in normalized.replace(
+        ACCENTED_E, UNACCENTED_E
+    ):
         return f"[~] {priorite}"
     return f"[-] {priorite}"
