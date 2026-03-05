@@ -12,6 +12,9 @@ from src.decision.engine import ClinicalDecision
 from src.config.thresholds import SEUIL_SECURITE_NEGATIF
 
 
+NOTUMOR_ALIASES = {"notumor", "pasdetumeur", "sanstumeur", "saintumeur"}
+
+
 def appliquer_regle_securite_negatif(
     decision: ClinicalDecision, seuil_securite: float = SEUIL_SECURITE_NEGATIF
 ) -> ClinicalDecision:
@@ -34,7 +37,7 @@ def appliquer_regle_securite_negatif(
     # Normaliser le nom de classe (support multiples formats)
     classe_lower = decision.classe_predite.lower().replace(" ", "").replace("_", "")
 
-    if classe_lower in ["notumor", "pasdetumeur", "saintumeur"]:
+    if classe_lower in NOTUMOR_ALIASES:
         if decision.confiance < seuil_securite:
             # Déclencher l'alerte de sécurité
             decision.alerte_securite = True
@@ -42,8 +45,8 @@ def appliquer_regle_securite_negatif(
 
             # Modifier la recommandation
             decision.action_recommandee = (
-                "⚠️ VERIFICATION OBLIGATOIRE (risque faux négatif) - "
-                "Double lecture + IRM de contrôle recommandée"
+                "Verification obligatoire (risque faux negatif) - "
+                "Double lecture + IRM de controle recommandee"
             )
 
             # Ajuster la décision textuelle
@@ -151,8 +154,7 @@ def statistiques_securite(decisions: List[ClinicalDecision]) -> dict:
     n_notumor = sum(
         1
         for d in decisions
-        if d.classe_predite.lower().replace(" ", "").replace("_", "")
-        in ["notumor", "pasdetumeur", "saintumeur"]
+        if d.classe_predite.lower().replace(" ", "").replace("_", "") in NOTUMOR_ALIASES
     )
 
     n_notumor_alertes = sum(
@@ -160,7 +162,7 @@ def statistiques_securite(decisions: List[ClinicalDecision]) -> dict:
         for d in decisions
         if (
             d.classe_predite.lower().replace(" ", "").replace("_", "")
-            in ["notumor", "pasdetumeur", "saintumeur"]
+            in NOTUMOR_ALIASES
         )
         and d.alerte_securite
     )

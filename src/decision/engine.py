@@ -79,7 +79,7 @@ def generer_decision_clinique(
     """Génère une décision clinique à partir des probabilités du modèle.
 
     Cette fonction implémente les règles métier du SAD:
-    - Haute confiance (≥0.85): diagnostic automatique avec validation légère
+    - Haute confiance (≥0.85): diagnostic automatique valide
     - Confiance moyenne (0.65-0.85): révision recommandée par radiologue junior
     - Confiance faible (0.50-0.65): révision par radiologue senior
     - Confiance très faible (<0.50): double lecture obligatoire + examens complémentaires
@@ -109,23 +109,23 @@ def generer_decision_clinique(
 
     # Générer les recommandations selon le niveau de confiance
     if confiance >= seuils.haute:
-        decision = f"Diagnostic : {classe_predite} (haute confiance)"
-        action = "Validation finale par radiologue (optionnelle)"
+        decision = "Diagnostic automatique valide"
+        action = "Rapport envoye au medecin traitant"
         revision_requise = False
 
     elif confiance >= seuils.moyenne:
-        decision = f"Diagnostic probable : {classe_predite}"
-        action = "Validation par radiologue junior recommandée"
+        decision = "Diagnostic probable - Revision recommandee"
+        action = "Validation par radiologue junior"
         revision_requise = True
 
     elif confiance >= seuils.faible:
-        decision = f"Cas incertain : {classe_predite} suspecté"
-        action = "Révision par radiologue senior obligatoire"
+        decision = "Cas incertain"
+        action = "Revision par radiologue senior"
         revision_requise = True
 
     else:
-        decision = "Incertitude élevée - diagnostic non conclusif"
-        action = "Double lecture obligatoire + IRM complémentaire"
+        decision = "Incertitude elevee"
+        action = "Double lecture obligatoire + IRM complementaire"
         revision_requise = True
 
     # La priorité sera déterminée par le module triage
@@ -143,6 +143,34 @@ def generer_decision_clinique(
         priorite=priorite,
         revision_requise=revision_requise,
         alerte_securite=False,  # Sera mis à jour par rules.py
+    )
+
+
+def generer_recommandation(
+    probabilites: np.ndarray,
+    classes: List[str],
+    seuils: Optional[DecisionThresholds] = None,
+    patient_id: str = "P_00000",
+) -> ClinicalDecision:
+    """Applique les regles de decision et retourne une recommandation clinique.
+
+    Cette fonction fournit une API simple conforme au cahier des charges
+    de la Tache 5 et repose sur ``generer_decision_clinique``.
+
+    Args:
+        probabilites: Probabilites par classe (shape: [n_classes])
+        classes: Liste des classes dans le meme ordre que ``probabilites``
+        seuils: Seuils personnalises (optionnel)
+        patient_id: Identifiant patient (defaut: P_00000)
+
+    Returns:
+        ClinicalDecision
+    """
+    return generer_decision_clinique(
+        patient_id=patient_id,
+        probabilites=probabilites,
+        classes=classes,
+        seuils=seuils,
     )
 
 
