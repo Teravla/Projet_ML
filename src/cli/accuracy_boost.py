@@ -1,4 +1,5 @@
-"""Script pour améliorer l'accuracy à >90%
+"""Script pour améliorer l'accuracy à >90%.
+
 Stratégies:
 1. CNN amélioré (ResNet-inspired)
 2. Transfer learning (EfficientNetB0)
@@ -10,20 +11,52 @@ Stratégies:
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
-import sys
+
 import keras
 import numpy as np
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 import tensorflow as tf
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from src.data.loader import load_dataset_split
-from src.data.preprocess import preprocess_dataset
+
+TARGET_ACCURACY = 0.90
+BASELINE_ACCURACY_PERCENT = 28.33
+NUM_CLASSES = 4
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    """Configuration d'entraînement des modèles."""
+
+    epochs: int = 100
+    batch_size: int = 16
+
+
+@dataclass(frozen=True)
+class PreparedData:
+    """Données préparées pour l'entraînement et l'évaluation."""
+
+    x_train: np.ndarray
+    x_val: np.ndarray
+    y_train: np.ndarray
+    y_val: np.ndarray
+    x_test: np.ndarray
+    y_test: np.ndarray
+    class_names: list[str]
+
+
+@dataclass(frozen=True)
+class EvaluationResult:
+    """Résultats consolidés d'évaluation."""
+
+    y_pred_ensemble: np.ndarray
+    acc_cnn: float
+    acc_transfer: float | None
+    acc_ensemble: float
+    model_transfer: keras.Model | None
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,14 +75,13 @@ def parse_args() -> argparse.Namespace:
 
 def build_improved_cnn(
     input_shape: tuple[int, int, int],
-    num_classes: int = 4,
+    num_classes: int = NUM_CLASSES,
     learning_rate: float = 1e-4,
 ) -> keras.Model:
-    """CNN amélioré avec batch norm, skip connections, regularization."""
+    """CNN amélioré avec batch norm, skip connections et regularization."""
 
     inputs = keras.Input(shape=input_shape, name="image_input")
 
-    # Bloc 1: Conv + BatchNorm + Pool
     x = keras.layers.Conv2D(64, 3, padding="same", use_bias=False)(inputs)
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Activation("relu")(x)
@@ -59,7 +91,6 @@ def build_improved_cnn(
     x = keras.layers.MaxPooling2D(pool_size=2)(x)
     x = keras.layers.Dropout(0.25)(x)
 
-    # Bloc 2: Résiduel-like
     residual = keras.layers.Conv2D(128, 1, padding="same")(x)
     x = keras.layers.Conv2D(128, 3, padding="same", use_bias=False)(x)
     x = keras.layers.BatchNormalization()(x)
@@ -71,7 +102,6 @@ def build_improved_cnn(
     x = keras.layers.MaxPooling2D(pool_size=2)(x)
     x = keras.layers.Dropout(0.25)(x)
 
-    # Bloc 3
     x = keras.layers.Conv2D(256, 3, padding="same", use_bias=False)(x)
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Activation("relu")(x)
@@ -81,7 +111,6 @@ def build_improved_cnn(
     x = keras.layers.MaxPooling2D(pool_size=2)(x)
     x = keras.layers.Dropout(0.25)(x)
 
-    # Global Average Pooling + Dense
     x = keras.layers.GlobalAveragePooling2D()(x)
     x = keras.layers.Dense(512, use_bias=False)(x)
     x = keras.layers.BatchNormalization()(x)
@@ -96,7 +125,6 @@ def build_improved_cnn(
     logits = keras.layers.Dense(num_classes, name="logits")(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="improved_cnn")
-
     optimizer = keras.optimizers.Adam(learning_rate=learning_rate, clipnorm=1.0)
     model.compile(
         optimizer=optimizer,
@@ -108,31 +136,24 @@ def build_improved_cnn(
 
 def build_transfer_learning_model(
     input_shape: tuple[int, int, int],
-    num_classes: int = 4,
+    num_classes: int = NUM_CLASSES,
     learning_rate: float = 1e-4,
 ) -> keras.Model:
     """Transfer learning avec EfficientNetB0."""
 
-    # Charger EfficientNetB0 pré-entraîné
     base_model = keras.applications.EfficientNetB0(
         input_shape=input_shape,
         include_top=False,
         weights="imagenet",
     )
 
-    # Geler les couches initiales, dégeler les dernières
     for layer in base_model.layers[:-40]:
         layer.trainable = False
 
     inputs = keras.Input(shape=input_shape)
-
-    # Les images du pipeline sont en [0, 1]. EfficientNetB0 (Keras) est calibré
-    # pour des entrées [0, 255], donc on remonte l'échelle avant le backbone.
     x = keras.layers.Rescaling(255.0)(inputs)
-    # Mode inference pour stabiliser les BatchNorm majoritairement gelées.
     x = base_model(x, training=False)
 
-    # Head de classification
     x = keras.layers.GlobalAveragePooling2D()(x)
     x = keras.layers.Dense(512, activation="relu", use_bias=False)(x)
     x = keras.layers.BatchNormalization()(x)
@@ -143,7 +164,6 @@ def build_transfer_learning_model(
     logits = keras.layers.Dense(num_classes)(x)
 
     model = keras.Model(inputs=inputs, outputs=logits, name="transfer_learning")
-
     optimizer = keras.optimizers.Adam(learning_rate=learning_rate)
     model.compile(
         optimizer=optimizer,
@@ -155,16 +175,15 @@ def build_transfer_learning_model(
 
 def train_model_with_augmentation(
     model: keras.Model,
-    x_train: np.ndarray,
-    y_train: np.ndarray,
-    x_val: np.ndarray,
-    y_val: np.ndarray,
-    epochs: int = 50,
-    batch_size: int = 32,
+    train_data: tuple[np.ndarray, np.ndarray],
+    validation_data: tuple[np.ndarray, np.ndarray],
+    config: TrainingConfig,
 ) -> keras.callbacks.History:
-    """Entraîne avec data augmentation et learning rate scheduling."""
+    """Entraîne un modèle avec data augmentation et learning-rate scheduling."""
 
-    # Data augmentation robuste
+    x_train, y_train = train_data
+    x_val, y_val = validation_data
+
     train_augmentation = keras.Sequential(
         [
             keras.layers.RandomFlip("horizontal"),
@@ -175,7 +194,6 @@ def train_model_with_augmentation(
         ]
     )
 
-    # Callbacks
     callbacks = [
         keras.callbacks.EarlyStopping(
             monitor="val_accuracy",
@@ -192,19 +210,16 @@ def train_model_with_augmentation(
         ),
     ]
 
-    # Augmenter les données d'entraînement
     x_train_augmented = train_augmentation(x_train, training=True)
-
-    history = model.fit(
+    return model.fit(
         x_train_augmented,
         y_train,
         validation_data=(x_val, y_val),
-        epochs=epochs,
-        batch_size=batch_size,
+        epochs=config.epochs,
+        batch_size=config.batch_size,
         callbacks=callbacks,
         verbose=1,
     )
-    return history
 
 
 def ensemble_predict(
@@ -212,47 +227,34 @@ def ensemble_predict(
     x_data: np.ndarray,
     weights: list[float] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Fusion pondérée des prédictions de plusieurs modèles.
-
-    Returns:
-        (y_pred_ensemble, y_proba_ensemble)
-    """
+    """Fusion pondérée des prédictions de plusieurs modèles."""
 
     if weights is None:
         weights = [1.0 / len(models)] * len(models)
 
-    ensemble_logits = np.zeros((x_data.shape[0], 4))
-
+    ensemble_logits = np.zeros((x_data.shape[0], NUM_CLASSES))
     for model, weight in zip(models, weights):
         logits = model.predict(x_data, verbose=0)
         ensemble_logits += weight * logits
 
-    # Softmax sur les logits pondérés
     probs = tf.nn.softmax(ensemble_logits, axis=1).numpy()
     preds = np.argmax(ensemble_logits, axis=1)
-
     return preds, probs
 
 
-def main() -> None:
-    args = parse_args()
+def encode_labels(labels: np.ndarray, class_names: list[str]) -> np.ndarray:
+    """Convertit les labels en indices entiers de classes."""
 
-    print("\n🚀 AMÉLIORATION DE L'ACCURACY - TARGET: >90%\n")
-    print("=" * 70)
-
-    # Paramètres
-    data_dir = Path("data")
-    img_size = (args.img_size, args.img_size)
-    epochs = 100  # Augmenté de 10 à 100
-    batch_size = 16  # Réduit pour meilleure convergence
-
-    print(
-        f"Configuration: image_size={img_size[0]}x{img_size[1]}, "
-        f"epochs={epochs}, batch_size={batch_size}"
+    return (
+        np.array(labels, dtype=np.int64)
+        if isinstance(labels[0], (int, np.integer))
+        else np.array([class_names.index(label) for label in labels], dtype=np.int64)
     )
 
-    # Charger les données
-    print("\n[1/5] Chargement des données...")
+
+def prepare_data(data_dir: Path, img_size: tuple[int, int]) -> PreparedData:
+    """Charge, normalise et découpe les données train/validation/test."""
+
     train_split = load_dataset_split(data_dir / "Training", image_size=img_size)
     test_split = load_dataset_split(
         data_dir / "Testing",
@@ -260,76 +262,89 @@ def main() -> None:
         class_names=train_split.class_names,
     )
 
-    x_train = train_split.images.astype(np.float32) / 255.0
-    # Labels peuvent être déjà des indices (np.int64) ou des noms de classe (str)
-    y_train_raw = train_split.labels
-    if isinstance(y_train_raw[0], (int, np.integer)):
-        y_train = np.array(y_train_raw, dtype=np.int64)
-    else:
-        y_train = np.array(
-            [train_split.class_names.index(label) for label in y_train_raw]
-        )
-
+    x_train_all = train_split.images.astype(np.float32) / 255.0
+    y_train_all = encode_labels(train_split.labels, train_split.class_names)
     x_test = test_split.images.astype(np.float32) / 255.0
-    y_test_raw = test_split.labels
-    if isinstance(y_test_raw[0], (int, np.integer)):
-        y_test = np.array(y_test_raw, dtype=np.int64)
-    else:
-        y_test = np.array([test_split.class_names.index(label) for label in y_test_raw])
+    y_test = encode_labels(test_split.labels, test_split.class_names)
 
-    # Split train en train/val
     x_train, x_val, y_train, y_val = train_test_split(
-        x_train, y_train, test_size=0.2, random_state=42, stratify=y_train
+        x_train_all,
+        y_train_all,
+        test_size=0.2,
+        random_state=42,
+        stratify=y_train_all,
     )
 
-    print(f"  Train: {x_train.shape}, Val: {x_val.shape}, Test: {x_test.shape}")
+    return PreparedData(
+        x_train=x_train,
+        x_val=x_val,
+        y_train=y_train,
+        y_val=y_val,
+        x_test=x_test,
+        y_test=y_test,
+        class_names=train_split.class_names,
+    )
 
-    # Entraîner plusieurs modèles
+
+def train_models(
+    data: PreparedData,
+    config: TrainingConfig,
+) -> tuple[keras.Model, keras.Model | None]:
+    """Entraîne le CNN amélioré et tente l'entraînement transfer learning."""
+
     print("\n[2/5] Entraînement du CNN amélioré...")
-    cnn_improved = build_improved_cnn(x_train.shape[1:])
+    cnn_improved = build_improved_cnn(data.x_train.shape[1:])
     train_model_with_augmentation(
-        cnn_improved,
-        x_train,
-        y_train,
-        x_val,
-        y_val,
-        epochs=epochs,
-        batch_size=batch_size,
+        model=cnn_improved,
+        train_data=(data.x_train, data.y_train),
+        validation_data=(data.x_val, data.y_val),
+        config=config,
     )
 
     print("\n[3/5] Entraînement avec Transfer Learning (EfficientNetB0)...")
-    model_transfer = build_transfer_learning_model(x_train.shape[1:])
+    model_transfer = build_transfer_learning_model(data.x_train.shape[1:])
+    transfer_config = TrainingConfig(
+        epochs=config.epochs // 2, batch_size=config.batch_size
+    )
+
     try:
         train_model_with_augmentation(
-            model_transfer,
-            x_train,
-            y_train,
-            x_val,
-            y_val,
-            epochs=epochs // 2,
-            batch_size=batch_size,
+            model=model_transfer,
+            train_data=(data.x_train, data.y_train),
+            validation_data=(data.x_val, data.y_val),
+            config=transfer_config,
         )
-    except Exception as e:
-        print(f"  ⚠️ Transfer learning échoué: {e}")
+    except (ValueError, RuntimeError, tf.errors.OpError) as exc:
+        print(f"  Transfer learning échoué: {exc}")
         model_transfer = None
 
-    # Évaluer les modèles
+    return cnn_improved, model_transfer
+
+
+def evaluate_models(
+    data: PreparedData,
+    cnn_improved: keras.Model,
+    model_transfer: keras.Model | None,
+) -> EvaluationResult:
+    """Évalue CNN/transfer et calcule la prédiction d'ensemble."""
+
     print("\n[4/5] Évaluation sur l'ensemble test...")
 
-    y_pred_cnn = np.argmax(cnn_improved.predict(x_test, verbose=0), axis=1)
-    acc_cnn = accuracy_score(y_test, y_pred_cnn)
+    y_pred_cnn = np.argmax(cnn_improved.predict(data.x_test, verbose=0), axis=1)
+    acc_cnn = accuracy_score(data.y_test, y_pred_cnn)
     print(f"  CNN Amélioré Accuracy:  {acc_cnn:.4f} ({acc_cnn*100:.2f}%)")
 
-    # Ensemble voting (robuste): n'agrège que si ça améliore réellement.
     models_to_ensemble = [cnn_improved]
     weights_to_use = [1.0]
+    acc_transfer: float | None = None
 
     if model_transfer is not None:
-        y_pred_transfer = np.argmax(model_transfer.predict(x_test, verbose=0), axis=1)
-        acc_transfer = accuracy_score(y_test, y_pred_transfer)
+        y_pred_transfer = np.argmax(
+            model_transfer.predict(data.x_test, verbose=0), axis=1
+        )
+        acc_transfer = accuracy_score(data.y_test, y_pred_transfer)
         print(f"  Transfer Learning Acc: {acc_transfer:.4f} ({acc_transfer*100:.2f}%)")
 
-        # Pondération par performance: on évite qu'un modèle faible dégrade l'ensemble.
         if acc_transfer > acc_cnn:
             total = acc_cnn + acc_transfer
             models_to_ensemble.append(model_transfer)
@@ -343,45 +358,98 @@ def main() -> None:
 
     print("\n[5/5] Fusion d'ensemble...")
     y_pred_ensemble, _ = ensemble_predict(
-        models_to_ensemble, x_test, weights=weights_to_use
+        models_to_ensemble, data.x_test, weights=weights_to_use
     )
-    acc_ensemble = accuracy_score(y_test, y_pred_ensemble)
+    acc_ensemble = accuracy_score(data.y_test, y_pred_ensemble)
     print(f"  Ensemble Accuracy:      {acc_ensemble:.4f} ({acc_ensemble*100:.2f}%)")
 
-    # Objectif atteint?
-    print("\n" + "=" * 70)
-    if acc_ensemble > 0.90:
-        print(f"✅ OBJECTIF ATTEINT! Accuracy: {acc_ensemble*100:.2f}% > 90%")
-    else:
-        improvement = (acc_ensemble * 100) - 28.33
-        print(
-            f"📈 Amélioration: +{improvement:.2f}% (28.33% → {acc_ensemble*100:.2f}%)"
-        )
-        print(f"   Objectif: >90%")
+    return EvaluationResult(
+        y_pred_ensemble=y_pred_ensemble,
+        acc_cnn=acc_cnn,
+        acc_transfer=acc_transfer,
+        acc_ensemble=acc_ensemble,
+        model_transfer=model_transfer,
+    )
 
-    # Rapport détaillé
+
+def print_goal_status(acc_ensemble: float) -> None:
+    """Affiche l'état d'atteinte de l'objectif d'accuracy."""
+
+    print("\n" + "=" * 70)
+    if acc_ensemble > TARGET_ACCURACY:
+        print(f"OBJECTIF ATTEINT! Accuracy: {acc_ensemble*100:.2f}% > 90%")
+        return
+
+    improvement = (acc_ensemble * 100) - BASELINE_ACCURACY_PERCENT
+    print(
+        f"Amélioration: +{improvement:.2f}% "
+        f"({BASELINE_ACCURACY_PERCENT:.2f}% -> {acc_ensemble*100:.2f}%)"
+    )
+    print("   Objectif: >90%")
+
+
+def print_classification_summary(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    class_names: list[str],
+) -> None:
+    """Affiche le rapport de classification détaillé."""
+
     print("\n" + "=" * 70)
     print("RAPPORT DE CLASSIFICATION")
     print("=" * 70)
     print(
         classification_report(
-            y_test,
-            y_pred_ensemble,
-            target_names=train_split.class_names,
+            y_true,
+            y_pred,
+            target_names=class_names,
             digits=4,
         )
     )
 
-    # Sauvegarder les modèles
-    print("\n💾 Sauvegarde des modèles...")
+
+def save_models(cnn_model: keras.Model, transfer_model: keras.Model | None) -> None:
+    """Sauvegarde les modèles entraînés dans artifacts/models."""
+
+    print("\nSauvegarde des modèles...")
     artifacts_dir = Path("artifacts/models")
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-    cnn_improved.save(artifacts_dir / "cnn_improved.h5")
-    if model_transfer is not None:
-        model_transfer.save(artifacts_dir / "transfer_learning_efficientnet.h5")
+    cnn_model.save(artifacts_dir / "cnn_improved.h5")
+    if transfer_model is not None:
+        transfer_model.save(artifacts_dir / "transfer_learning_efficientnet.h5")
 
-    print(f"  ✓ Modèles sauvegardés dans {artifacts_dir}")
+    print(f"  Modèles sauvegardés dans {artifacts_dir}")
+
+
+def main() -> None:
+    """Exécute le pipeline complet d'amélioration d'accuracy."""
+
+    args = parse_args()
+    img_size = (args.img_size, args.img_size)
+    config = TrainingConfig()
+
+    print("\nAMÉLIORATION DE L'ACCURACY - TARGET: >90%\n")
+    print("=" * 70)
+    print(
+        f"Configuration: image_size={img_size[0]}x{img_size[1]}, "
+        f"epochs={config.epochs}, batch_size={config.batch_size}"
+    )
+
+    print("\n[1/5] Chargement des données...")
+    data = prepare_data(Path("data"), img_size)
+    print(
+        f"  Train: {data.x_train.shape}, Val: {data.x_val.shape}, Test: {data.x_test.shape}"
+    )
+
+    cnn_model, transfer_model = train_models(data, config)
+    evaluation = evaluate_models(data, cnn_model, transfer_model)
+
+    print_goal_status(evaluation.acc_ensemble)
+    print_classification_summary(
+        data.y_test, evaluation.y_pred_ensemble, data.class_names
+    )
+    save_models(cnn_model, evaluation.model_transfer)
 
     print("\n" + "=" * 70)
 
