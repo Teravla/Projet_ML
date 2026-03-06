@@ -11,7 +11,6 @@ Stratégies:
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 from pathlib import Path
 
 import keras
@@ -20,7 +19,6 @@ from sklearn.metrics import accuracy_score, classification_report
 import tensorflow as tf
 
 from src.data.pipeline import (
-    TrainValTestData,
     load_train_test_splits,
     split_train_validation,
 )

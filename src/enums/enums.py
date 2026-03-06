@@ -22,21 +22,22 @@ class HyperParametersInt(IntEnum):
     TARGET_ACCURACY = 0.90
     VARIANCE_THRESHOLD = 0.001
     RANGE = 42
+    MIN_PROBABILITIES_FOR_AMBIGUITY = 2
 
 
 class HyperParametersStr(StrEnum):
     """String hyperparameters for training and evaluation."""
+
     URGENT_QUEUE_KEY = "URGENTE (12h)"
 
 
 class PriorityLevel(StrEnum):
     """Priority levels for triage and decision making."""
 
-    PRIORITY_URGENTE = "URGENTE"
-    PRIORITY_ELEVEE = "Elevee"
-    PRIORITY_ELEVEE_ACCENT = "Élevée"
-    PRIORITY_NORMALE = "Normale"
-    PRIORITY_ROUTINE = "Routine"
+    PRIORITY_URGENTE = "URGENTE (12h)"
+    PRIORITY_ELEVEE = "Élevée (24h)"
+    PRIORITY_NORMALE = "Normale (48h)"
+    PRIORITY_ROUTINE = "Routine (1 semaine)"
 
 
 class ConfidenceLevel(StrEnum):
@@ -48,6 +49,20 @@ class ConfidenceLevel(StrEnum):
     CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
 
 
+class ConfidenceLevelThresholds(IntEnum):
+    # High confidence threshold: automatic diagnosis possible
+    SEUIL_CONFIANCE_HAUTE = 0.85
+
+    # Medium confidence threshold: validation recommended
+    SEUIL_CONFIANCE_MOYENNE = 0.65
+
+    # Low confidence threshold: senior expertise required
+    SEUIL_CONFIANCE_FAIBLE = 0.50
+
+    # Very high confidence threshold for "No tumor" (false negative safety)
+    SEUIL_SECURITE_NEGATIF = 0.95
+
+
 class TumorType(StrEnum):
     """Tumors types for classification."""
 
@@ -55,6 +70,15 @@ class TumorType(StrEnum):
     MENINGIOMA = "meningioma"
     NOTUMOR = "notumor"
     PITUITARY = "pituitary"
+
+
+class FileExtension(StrEnum):
+    """Allowed file extensions for image loading."""
+
+    PNG = ".png"
+    JPG = ".jpg"
+    JPEG = ".jpeg"
+    BMP = ".bmp"
 
 
 class Colors(StrEnum):
@@ -69,3 +93,19 @@ class Colors(StrEnum):
     ENDC = "\033[0m"  # Reset
     BOLD = "\033[1m"  # Bold
     UNDERLINE = "\033[4m"  # Underline
+
+
+class CostReview(IntEnum):
+    """Cost values for business analysis."""
+
+    COUT_FAUX_NEGATIF = 1000  # Euros - High cost for missing a tumor (false negative)
+    COUT_FAUX_POSITIF = 100  # Euros - High cost for a false positive
+    COUT_REVISION_HUMAINE = 50  # Euros - Cost of human review
+
+class NoTumorAlias(StrEnum):
+    """Aliases for the "notumor" class to handle variations in naming."""
+
+    NOTUMOR = "notumor"
+    PAS_DE_TUMEUR = "pasdetumeur"
+    SANS_TUMEUR = "sanstumeur"
+    SAIN_TUMEUR = "saintumeur"

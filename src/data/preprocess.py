@@ -2,23 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import cv2
 import numpy as np
 
-
-@dataclass(frozen=True)
-class LabelEncodingConfig:
-    """Configuration d'encodage des labels."""
-
-    one_hot: bool = False
-    num_classes: int | None = None
-
-
-# OpenCV est une extension C, pylint peut ne pas résoudre ses membres statiquement.
-_CV_RESIZE = getattr(cv2, "resize")
-_CV_INTER_AREA = getattr(cv2, "INTER_AREA")
+from src.config.config import CV_INTER_AREA, CV_RESIZE
+from src.enums.dataclass import LabelEncodingConfig
 
 
 def resize_images(
@@ -28,7 +16,7 @@ def resize_images(
 
     width, height = target_size
     resized = [
-        _CV_RESIZE(image, (width, height), interpolation=_CV_INTER_AREA)
+        CV_RESIZE(image, (width, height), interpolation=CV_INTER_AREA)
         for image in images
     ]
     return np.asarray(resized, dtype=np.float32)

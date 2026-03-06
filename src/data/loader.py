@@ -6,20 +6,18 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-import cv2
+
 import numpy as np
 
-
-DEFAULT_CLASS_NAMES = ["glioma", "meningioma", "pituitary", "notumor"]
-ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp"}
-
-# OpenCV est une extension C, pylint peut ne pas résoudre ses membres statiquement.
-_CV_IMREAD = getattr(cv2, "imread")
-_CV_IMREAD_COLOR = getattr(cv2, "IMREAD_COLOR")
-_CV_CVT_COLOR = getattr(cv2, "cvtColor")
-_CV_COLOR_BGR2RGB = getattr(cv2, "COLOR_BGR2RGB")
-_CV_RESIZE = getattr(cv2, "resize")
-_CV_INTER_AREA = getattr(cv2, "INTER_AREA")
+from src.config.config import (
+    CV_COLOR_BGR2RGB,
+    CV_CVT_COLOR,
+    CV_IMREAD,
+    CV_IMREAD_COLOR,
+    CV_INTER_AREA,
+    CV_RESIZE,
+)
+from src.enums.enums import FileExtension, TumorType
 
 
 @dataclass(frozen=True)
@@ -33,7 +31,9 @@ class DatasetSplit:
 
 
 def _is_image_file(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in ALLOWED_EXTENSIONS
+    return path.is_file() and path.suffix.lower() in tuple(
+        FileExtension.__members__.values()
+    )
 
 
 def discover_classes(
@@ -42,7 +42,11 @@ def discover_classes(
     """Retourne les classes présentes dans le répertoire du split."""
 
     split_path = Path(split_dir)
-    expected = list(class_names) if class_names is not None else DEFAULT_CLASS_NAMES
+    expected = (
+        list(class_names)
+        if class_names is not None
+        else list(TumorType.__members__.keys())
+    )
     discovered = [
         class_name for class_name in expected if (split_path / class_name).is_dir()
     ]
@@ -73,13 +77,13 @@ def load_image(
     """Charge une image depuis le disque et la redimensionne."""
 
     path = Path(image_path)
-    image = _CV_IMREAD(str(path), _CV_IMREAD_COLOR)
+    image = CV_IMREAD(str(path), CV_IMREAD_COLOR)
     if image is None:
         raise ValueError(f"Image illisible: {path}")
     if rgb:
-        image = _CV_CVT_COLOR(image, _CV_COLOR_BGR2RGB)
+        image = CV_CVT_COLOR(image, CV_COLOR_BGR2RGB)
     width, height = image_size
-    image = _CV_RESIZE(image, (width, height), interpolation=_CV_INTER_AREA)
+    image = CV_RESIZE(image, (width, height), interpolation=CV_INTER_AREA)
     return image.astype(np.float32)
 
 

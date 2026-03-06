@@ -27,9 +27,6 @@ from src.models.cnn import (
 )
 
 
-
-
-
 def parse_args() -> argparse.Namespace:
     """Parse les arguments de la ligne de commande."""
     parser = argparse.ArgumentParser(

@@ -36,7 +36,7 @@ from src.decision.triage import (
     generer_file_attente,
     statistiques_triage,
 )
-from src.config.thresholds import DecisionThresholds
+from src.config.config import DecisionThresholds
 from src.enums.dataclass import RuntimeConfigT5
 from src.enums.enums import ConfidenceLevel, HyperParametersStr, ModelType
 from src.models.cnn import build_cnn_classifier
@@ -391,7 +391,9 @@ def print_examples(decisions: list[Any], files_attente: dict[str, list[Any]]) ->
 
     if files_attente.get(HyperParametersStr.URGENT_QUEUE_KEY):
         print("\n>>> EXEMPLE 1 : Cas URGENT")
-        afficher_exemple_decision(files_attente[HyperParametersStr.URGENT_QUEUE_KEY][0], idx=1)
+        afficher_exemple_decision(
+            files_attente[HyperParametersStr.URGENT_QUEUE_KEY][0], idx=1
+        )
 
     cas_alertes = [decision for decision in decisions if decision.alerte_securite]
     if cas_alertes:

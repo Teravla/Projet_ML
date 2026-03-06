@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -10,18 +9,6 @@ from sklearn.model_selection import train_test_split
 
 from src.data.loader import DatasetSplit, load_dataset_split
 from src.data.preprocess import preprocess_dataset
-
-
-@dataclass(frozen=True)
-class TrainValTestData:
-    """Conteneur standard pour les tenseurs train/val/test."""
-
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
 
 
 def load_train_test_splits(

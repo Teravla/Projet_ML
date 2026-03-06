@@ -14,7 +14,7 @@ from src.decision.engine import (
     CONFIDENCE_MOYENNE,
     CONFIDENCE_TRES_FAIBLE,
 )
-from src.config.thresholds import (
+from src.config.config import (
     GRAVITE_CLINIQUE,
     PRIORITE_URGENTE,
     PRIORITE_ELEVEE,

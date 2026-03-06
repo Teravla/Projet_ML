@@ -360,12 +360,7 @@ def api_stats():
     n_urgente = sum(
         1 for d in decisions if PriorityLevel.PRIORITY_URGENTE in d.priorite
     )
-    n_elevee = sum(
-        1
-        for d in decisions
-        if PriorityLevel.PRIORITY_ELEVEE in d.priorite
-        or PriorityLevel.PRIORITY_ELEVEE_ACCENT in d.priorite
-    )
+    n_elevee = sum(1 for d in decisions if PriorityLevel.PRIORITY_ELEVEE in d.priorite)
     n_normale = sum(
         1 for d in decisions if PriorityLevel.PRIORITY_NORMALE in d.priorite
     )

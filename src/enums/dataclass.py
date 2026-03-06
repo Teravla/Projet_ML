@@ -5,9 +5,9 @@ from typing import Optional
 import keras
 import numpy as np
 
-from src.config.thresholds import DecisionThresholds
+from src.config.config import DecisionThresholds
 from src.data.pipeline import TrainValTestData
-from src.enums.enums import TumorType
+from src.enums.enums import ConfidenceLevel, CostReview, TumorType
 
 
 @dataclass(frozen=True)
@@ -182,3 +182,123 @@ class ModelState:
     model_path: Optional[str] = None
     last_decisions: Optional[list] = None
     last_true_labels: Optional[list] = None
+
+
+@dataclass
+class DecisionThresholds:
+    """Ensemble des seuils pour le moteur de décision."""
+
+    haute: float = ConfidenceLevel.CONFIDENCE_HAUTE
+    moyenne: float = ConfidenceLevel.CONFIDENCE_MOYENNE
+    faible: float = ConfidenceLevel.CONFIDENCE_FAIBLE
+    securite_negatif: float = ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
+
+
+@dataclass
+class CostParameters:
+    """Paramètres de coût pour l'analyse métier."""
+
+    faux_negatif: int = CostReview.COUT_FAUX_NEGATIF
+    faux_positif: int = CostReview.COUT_FAUX_POSITIF
+    revision: int = CostReview.COUT_REVISION_HUMAINE
+
+
+@dataclass(frozen=True)
+class TrainValTestData:
+    """Conteneur standard pour les tenseurs train/val/test."""
+
+    x_train: np.ndarray
+    x_val: np.ndarray
+    y_train: np.ndarray
+    y_val: np.ndarray
+    x_test: np.ndarray
+    y_test: np.ndarray
+
+
+@dataclass(frozen=True)
+class LabelEncodingConfig:
+    """Configuration d'encodage des labels."""
+
+    one_hot: bool = False
+    num_classes: int | None = None
+
+
+@dataclass
+class DecisionWorkflow:
+    """Informations workflow et sécurité associées à une décision."""
+
+    decision: str
+    action_recommandee: str
+    priorite: str
+    revision_requise: bool
+    alerte_securite: bool = False
+
+
+@dataclass
+class ClinicalDecision:
+    """Résultat d'une décision clinique automatisée.
+
+    Attributes:
+        patient_id: Identifiant du patient (ou index image)
+        classe_predite: Classe avec la probabilité maximale
+        confiance: Probabilité maximale (0-1)
+        probabilites: Dictionnaire {classe: probabilité} pour toutes les classes
+        niveau_confiance: Catégorie (HAUTE, MOYENNE, FAIBLE, TRES_FAIBLE)
+        decision: Texte descriptif de la décision
+        action_recommandee: Action clinique à entreprendre
+        priorite: Niveau d'urgence/priorité
+        revision_requise: Booléen indiquant si révision humaine obligatoire
+        alerte_securite: Indicateur d'alerte de sécurité (faux négatifs)
+    """
+
+    patient_id: str
+    classe_predite: str
+    confiance: float
+    probabilites: dict[str, float]
+    niveau_confiance: str
+    workflow: DecisionWorkflow
+
+    @property
+    def decision(self) -> str:
+        """Texte descriptif de la décision clinique."""
+        return self.workflow.decision
+
+    @decision.setter
+    def decision(self, value: str) -> None:
+        self.workflow.decision = value
+
+    @property
+    def action_recommandee(self) -> str:
+        """Action clinique recommandée."""
+        return self.workflow.action_recommandee
+
+    @action_recommandee.setter
+    def action_recommandee(self, value: str) -> None:
+        self.workflow.action_recommandee = value
+
+    @property
+    def priorite(self) -> str:
+        """Priorité clinique du cas."""
+        return self.workflow.priorite
+
+    @priorite.setter
+    def priorite(self, value: str) -> None:
+        self.workflow.priorite = value
+
+    @property
+    def revision_requise(self) -> bool:
+        """Indique si une révision humaine est requise."""
+        return self.workflow.revision_requise
+
+    @revision_requise.setter
+    def revision_requise(self, value: bool) -> None:
+        self.workflow.revision_requise = value
+
+    @property
+    def alerte_securite(self) -> bool:
+        """Indique si une alerte de sécurité est active."""
+        return self.workflow.alerte_securite
+
+    @alerte_securite.setter
+    def alerte_securite(self, value: bool) -> None:
+        self.workflow.alerte_securite = value
