@@ -7,10 +7,7 @@ des probabilités de modèle en recommandations cliniques actionnables.
 from typing import Optional
 import numpy as np
 
-from src.config.config import (
-    DecisionThresholds,
-)
-from src.enums.dataclass import ClinicalDecision, DecisionWorkflow
+from src.enums.dataclass import ClinicalDecision, DecisionThresholds, DecisionWorkflow
 from src.enums.enums import ConfidenceLevel
 
 

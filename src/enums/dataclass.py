@@ -5,9 +5,18 @@ from typing import Optional
 import keras
 import numpy as np
 
-from src.config.config import DecisionThresholds
 from src.data.pipeline import TrainValTestData
 from src.enums.enums import ConfidenceLevel, CostReview, TumorType
+
+
+@dataclass
+class DecisionThresholds:
+    """Ensemble des seuils pour le moteur de décision."""
+
+    haute: float = ConfidenceLevel.CONFIDENCE_HAUTE
+    moyenne: float = ConfidenceLevel.CONFIDENCE_MOYENNE
+    faible: float = ConfidenceLevel.CONFIDENCE_FAIBLE
+    securite_negatif: float = ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
 
 
 @dataclass(frozen=True)
@@ -182,16 +191,6 @@ class ModelState:
     model_path: Optional[str] = None
     last_decisions: Optional[list] = None
     last_true_labels: Optional[list] = None
-
-
-@dataclass
-class DecisionThresholds:
-    """Ensemble des seuils pour le moteur de décision."""
-
-    haute: float = ConfidenceLevel.CONFIDENCE_HAUTE
-    moyenne: float = ConfidenceLevel.CONFIDENCE_MOYENNE
-    faible: float = ConfidenceLevel.CONFIDENCE_FAIBLE
-    securite_negatif: float = ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
 
 
 @dataclass
