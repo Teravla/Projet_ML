@@ -44,11 +44,11 @@ async function checkModelStatus() {
         if (!data.model_loaded) {
             // Afficher l'alerte si pas de modèle
             document.getElementById('model-alert').style.display = 'block';
-            document.getElementById('api-status').innerHTML += ' <span style="color: orange;">(Données simulées - Aucun modèle)</span>';
+            document.getElementById('api-status').innerHTML = 'API Connectée <span style="color: orange;">(Données simulées - Aucun modèle)</span>';
         } else {
             // Masquer l'alerte si le modèle est chargé
             document.getElementById('model-alert').style.display = 'none';
-            document.getElementById('api-status').innerHTML += ' <span style="color: green;">(Modèle: ' + data.model_filename + ')</span>';
+            document.getElementById('api-status').innerHTML = 'API Connectée <span style="color: green;">(Modèle: ' + data.model_filename + ')</span>';
         }
     } catch (error) {
         console.error('Erreur lors de la vérification du statut du modèle:', error);
@@ -81,14 +81,12 @@ const TIME_ESTIMATES = {
 
 function showTrainingPage() {
     document.getElementById('training-page').style.display = 'block';
-    document.getElementById('model-alert').style.display = 'none';
     updateCommand();
     window.scrollTo(0, 0);
 }
 
 function hideTrainingPage() {
     document.getElementById('training-page').style.display = 'none';
-    document.getElementById('model-alert').style.display = 'block';
 }
 
 function setImageSize(size) {
@@ -243,36 +241,91 @@ function updateTimeEstimate() {
     document.getElementById('time-breakdown').textContent = breakdown.join(' + ');
 }
 
+function showModal(title, message, isSuccess = true) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-message').textContent = message;
+    const icon = document.getElementById('modal-icon');
+    if (isSuccess) {
+        icon.textContent = '✓';
+        icon.classList.remove('error');
+    } else {
+        icon.textContent = '✕';
+        icon.classList.add('error');
+    }
+    document.getElementById('notification-modal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('notification-modal').style.display = 'none';
+}
+
+// Fermer le modal en cliquant à l'extérieur
+window.onclick = function (event) {
+    const modal = document.getElementById('notification-modal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
 function copyCommand() {
     const cmd = document.getElementById('command-display').textContent;
     navigator.clipboard.writeText(cmd).then(() => {
-        alert('Commande copiée dans le presse-papiers!');
+        showModal('✓ Commande copiée', 'La commande a été copiée dans le presse-papiers!\nVous pouvez maintenant la coller dans votre terminal.', true);
     }).catch(err => {
         console.error('Erreur:', err);
-        alert('Erreur lors de la copie');
+        showModal('Erreur', 'Impossible de copier la commande dans le presse-papiers.', false);
     });
 }
 
 function executeTraining() {
     const cmd = document.getElementById('command-display').textContent;
-    alert(
-        'INSTRUCTIONS:\n\n' +
+    showModal(
+        'Instructions d\'entraînement',
+        'ÉTAPES À SUIVRE:\n\n' +
         '1. Ouvrez un terminal PowerShell\n' +
         '2. Naviguez jusqu\'au répertoire du projet:\n' +
         '   cd c:\\Users\\valen\\Documents\\EFREI\\I2\\Machine_Learning\\Projet\n\n' +
         '3. Exécutez la commande:\n' +
         '   ' + cmd + '\n\n' +
         '4. Patientez l\'entraînement (peut prendre plusieurs heures)\n' +
-        '5. Une fois terminé, rafraîchissez le dashboard pour charger le modèle\n\n' +
-        'La commande a été copiée. Appuyez sur Ctrl+C pour fermer ce message et coller dans le terminal.'
+        '5. Une fois terminé, rafraîchissez le dashboard pour charger le modèle',
+        true
     );
     copyCommand();
 }
 
 async function loadAllData() {
+    try {
+        // D'abord, recharger le modèle (important pour "Rafraîchir")
+        await reloadModel();
+    } catch (error) {
+        console.error('Erreur lors du rechargement du modèle:', error);
+    }
+
+    // Puis charger les données
     await loadStats();
     await loadDecisions();
     await loadMetrics();
+}
+
+async function reloadModel() {
+    try {
+        const response = await fetch(`${API_BASE}/reload-model`, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            console.log('[OK] Modèle rechargé:', data.model_filename);
+            // Mettre à jour le statut du modèle dans le header
+            await checkModelStatus();
+        } else {
+            console.warn('[WARN] Rechargement modèle échoué:', data.message);
+        }
+    } catch (error) {
+        console.error('[ERROR] Erreur rechargement modèle:', error);
+    }
 }
 
 async function loadStats() {

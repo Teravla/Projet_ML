@@ -579,6 +579,51 @@ def api_rapport(patient_id: str):
     return jsonify({"patient_id": patient_id, "rapport": rapport})
 
 
+@app.route("/api/reload-model", methods=["POST"])
+def reload_model():
+    """Recharge le modèle depuis le répertoire artifacts/models/."""
+    print("\n[*] Rechargement du modèle demandé via API...")
+
+    # Réinitialiser le cache des décisions pour forcer régénération
+    MODEL_STATE["last_decisions"] = None
+    MODEL_STATE["last_true_labels"] = None
+
+    # Recharger le modèle et les données
+    success = load_model_and_data()
+
+    if success:
+        model_name = (
+            Path(MODEL_STATE["model_path"]).name if MODEL_STATE["model_path"] else None
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Modèle rechargé: {model_name}",
+                "model_loaded": MODEL_STATE["model_loaded"],
+                "model_filename": model_name,
+                "data_available": MODEL_STATE["model_loaded"]
+                and MODEL_STATE["test_images"] is not None
+                and len(MODEL_STATE["test_images"]) > 0,
+                "num_test_samples": (
+                    len(MODEL_STATE["test_images"])
+                    if MODEL_STATE["test_images"] is not None
+                    else 0
+                ),
+            }
+        )
+    else:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "message": MODEL_STATE["error_message"],
+                    "model_loaded": False,
+                }
+            ),
+            400,
+        )
+
+
 @app.route("/api/health", methods=["GET"])
 def health_check():
     """Health check endpoint."""

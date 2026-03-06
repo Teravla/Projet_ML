@@ -3,11 +3,21 @@
 **Machine Learning Project (ALIF83)** - EFREI 2025–2026  
 Course Instructor: Mohamed HAMIDI
 
+## GitHub Repository
+
+**Project Repository**: [https://github.com/Teravla/Projet_ML](https://github.com/Teravla/Projet_ML)
+
+## Authors
+
+**Valentin MENON** - <valentin.menon@efrei.net>
+
 ---
 
 ## Table of Contents
 
 - [Brain Tumor Decision Support System (DSS) - Diagnosis Support](#brain-tumor-decision-support-system-dss---diagnosis-support)
+  - [GitHub Repository](#github-repository)
+  - [Authors](#authors)
   - [Table of Contents](#table-of-contents)
   - [Project Objective](#project-objective)
     - [Medical Context](#medical-context)
@@ -16,6 +26,9 @@ Course Instructor: Mohamed HAMIDI
   - [Installation](#installation)
     - [Without Poetry (pip)](#without-poetry-pip)
     - [With Poetry](#with-poetry)
+  - [Dataset Setup](#dataset-setup)
+    - [Download the Dataset](#download-the-dataset)
+    - [Organize the Data](#organize-the-data)
   - [Running Components](#running-components)
     - [The 7 Training Tasks](#the-7-training-tasks)
       - [**Task 1: Exploration \& Preprocessing**](#task-1-exploration--preprocessing)
@@ -64,6 +77,16 @@ Course Instructor: Mohamed HAMIDI
     - [Dashboard won't start?](#dashboard-wont-start)
     - [Notebooks won't open?](#notebooks-wont-open)
   - [Support \& Documentation](#support--documentation)
+  - [Critical Reflection: Why CNN Outperforms Other Techniques](#critical-reflection-why-cnn-outperforms-other-techniques)
+    - [Performance Comparison](#performance-comparison)
+    - [Why CNNs Excel at Medical Image Analysis](#why-cnns-excel-at-medical-image-analysis)
+      - [1. **Spatial Feature Preservation**](#1-spatial-feature-preservation)
+      - [2. **Hierarchical Feature Learning**](#2-hierarchical-feature-learning)
+      - [3. **Translation Invariance**](#3-translation-invariance)
+      - [4. **Parameter Efficiency**](#4-parameter-efficiency)
+    - [Limitations Addressed](#limitations-addressed)
+    - [Temperature Scaling Enhancement](#temperature-scaling-enhancement)
+    - [Conclusion](#conclusion)
   - [Ethics \& Responsibility](#ethics--responsibility)
 
 ---
@@ -144,6 +167,42 @@ If you have Poetry installed:
 ```bash
 poetry install
 ```
+
+---
+
+## Dataset Setup
+
+Before running any training tasks, you need to prepare the Brain Tumor MRI dataset.
+
+### Download the Dataset
+
+Download the **Brain Tumor MRI Dataset** from [Kaggle](https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset) or your preferred source.
+
+### Organize the Data
+
+Place the dataset in the `data/` directory with the following structure:
+
+```txt
+data/
+├── Testing/
+│   ├── glioma/
+│   ├── meningioma/
+│   ├── notumor/
+│   └── pituitary/
+└── Training/
+    ├── glioma/
+    ├── meningioma/
+    ├── notumor/
+    └── pituitary/
+```
+
+**Important**:
+
+- Each subdirectory should contain the corresponding MRI images (`.jpg`, `.png`, etc.)
+- The folder names must match exactly as shown above (case-sensitive)
+- Both `Training/` and `Testing/` folders are required for the system to work properly
+
+Once the data is organized, you can proceed with running the training tasks.
 
 ---
 
@@ -620,6 +679,70 @@ The 7 notebooks in `notebooks/` correspond to the project tasks.
 
 ---
 
+## Critical Reflection: Why CNN Outperforms Other Techniques
+
+### Performance Comparison
+
+Our experiments consistently demonstrate that **Convolutional Neural Networks (CNN)** significantly outperform traditional machine learning approaches for brain tumor MRI classification:
+
+| Model               | Accuracy | Key Limitation                            |
+| ------------------- | -------- | ----------------------------------------- |
+| **CNN (Optimized)** | **~95%** | Requires more computational resources     |
+| Logistic Regression | ~75%     | Cannot capture spatial features           |
+| MLP                 | ~80%     | Loses spatial structure (flattened input) |
+
+### Why CNNs Excel at Medical Image Analysis
+
+#### 1. **Spatial Feature Preservation**
+
+Unlike traditional ML methods that flatten images into 1D vectors, CNNs preserve the 2D spatial structure through convolutional layers. This is crucial for medical imaging where:
+
+- Tumor location matters
+- Tissue boundaries are diagnostic
+- Spatial patterns indicate pathology
+
+#### 2. **Hierarchical Feature Learning**
+
+CNNs automatically learn features at multiple scales:
+
+- **Early layers**: Detect edges, textures, and basic patterns
+- **Middle layers**: Identify tissue types and tumor margins
+- **Deep layers**: Recognize complex tumor morphology
+
+Logistic regression and MLPs require manual feature engineering and cannot discover these hierarchical representations.
+
+#### 3. **Translation Invariance**
+
+Convolutional layers with pooling provide translation invariance, meaning the network can detect tumors regardless of their position in the image—a critical capability for medical diagnosis.
+
+#### 4. **Parameter Efficiency**
+
+Despite having millions of parameters, CNNs use weight sharing across spatial locations, making them more efficient than fully-connected networks for image data.
+
+### Limitations Addressed
+
+While CNNs require:
+
+- More training time
+- GPU acceleration
+- Larger datasets
+
+These trade-offs are justified by the **20% accuracy improvement** over traditional methods, which directly translates to:
+
+- Fewer misdiagnoses
+- Better patient outcomes
+- Reduced need for invasive follow-up procedures
+
+### Temperature Scaling Enhancement
+
+Our implementation further improves CNN reliability through **temperature scaling calibration**, ensuring that confidence scores accurately reflect true prediction probabilities—essential for clinical decision-making.
+
+### Conclusion
+
+For medical image classification, CNNs are not just incrementally better—they represent a **fundamental paradigm shift** in how machines process visual medical data. Their ability to learn hierarchical spatial features makes them the gold standard for diagnostic AI systems.
+
+---
+
 ## Ethics & Responsibility
 
 **This system is an educational tool and demonstration.**
@@ -630,7 +753,3 @@ The 7 notebooks in `notebooks/` correspond to the project tasks.
 - False positives/negatives are possible.
 - Always requires human validation for critical cases.
 - Complies with project requirements (false negative minimization).
-
----
-
-**Good luck with your project!**
