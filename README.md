@@ -77,6 +77,11 @@ Course Instructor: Mohamed HAMIDI
     - [Dashboard won't start?](#dashboard-wont-start)
     - [Notebooks won't open?](#notebooks-wont-open)
   - [Support \& Documentation](#support--documentation)
+  - [Core Functions Implementation](#core-functions-implementation)
+    - [1. **Predict with Confidence**](#1-predict-with-confidence)
+    - [2. **Generate Recommendation**](#2-generate-recommendation)
+    - [3. **Calculate MC Dropout Uncertainty**](#3-calculate-mc-dropout-uncertainty)
+    - [4. **Create Decision Report**](#4-create-decision-report)
   - [Critical Reflection: Why CNN Outperforms Other Techniques](#critical-reflection-why-cnn-outperforms-other-techniques)
     - [Performance Comparison](#performance-comparison)
     - [Why CNNs Excel at Medical Image Analysis](#why-cnns-excel-at-medical-image-analysis)
@@ -676,6 +681,175 @@ The 7 notebooks in `notebooks/` correspond to the project tasks.
 - **Full Documentation**: Run `mkdocs serve` to view detailed docs.
 - **Source Code**: Consult files in `src/` with detailed comments.
 - **Project Specification**: See the project requirements provided by the course (Mohamed HAMIDI).
+
+---
+
+## Core Functions Implementation
+
+The project specification requires implementing 4 core functions for the Decision Support System. Below is the mapping between the specification and the actual implementation:
+
+### 1. **Predict with Confidence**
+
+**Specification:**
+
+```python
+def predire_avec_confiance(image, model):
+    """Returns prediction + confidence scores"""
+```
+
+**Implementation:** `predict_with_confidence()` in [`src/models/log_reg.py`](src/models/log_reg.py)
+
+```python
+def predict_with_confidence(
+    model: LogisticRegression,
+    x_data: np.ndarray,
+    uncertainty_threshold: float = 0.7,
+) -> PredictionSummary:
+    """Returns predicted classes, max confidence, and uncertainty mask."""
+    probas = model.predict_proba(x_data)
+    y_pred = np.argmax(probas, axis=1)
+    max_prob = np.max(probas, axis=1)
+    uncertain_mask = max_prob < uncertainty_threshold
+    return PredictionSummary(
+        y_pred=y_pred, max_prob=max_prob, uncertain_mask=uncertain_mask
+    )
+```
+
+**Usage:** Used in notebooks and CLI scripts to generate predictions with confidence metrics for model calibration.
+
+### 2. **Generate Recommendation**
+
+**Specification:**
+
+```python
+def generer_recommandation(probabilites, seuils):
+    """Applies decision rules"""
+```
+
+**Implementation:** `generer_recommandation()` in [`src/decision/engine.py`](src/decision/engine.py)
+
+```python
+def generer_recommandation(
+    probabilites: np.ndarray,
+    classes: list[str],
+    seuils: Optional[DecisionThresholds] = None,
+    patient_id: str = "P_00000",
+) -> ClinicalDecision:
+    """Applies decision rules and returns clinical recommendation.
+
+    This function wraps generer_decision_clinique() and applies:
+    - Confidence thresholds (>=85%, 65-84%, 50-64%, <50%)
+    - Safety alerts for false negative risk
+    - Triage priorities based on tumor type
+    - Human review requirements
+    """
+    return generer_decision_clinique(
+        patient_id=patient_id,
+        probabilites=probabilites,
+        classes=classes,
+        seuils=seuils,
+    )
+```
+
+**Usage:** Core decision engine function called by the dashboard API and all clinical workflows. Returns a `ClinicalDecision` object containing diagnosis, confidence level, recommended action, and triage priority.
+
+### 3. **Calculate MC Dropout Uncertainty**
+
+**Specification:**
+
+```python
+def calculer_incertitude_mc_dropout(image, model, n_iter=20):
+    """Estimates uncertainty via Monte Carlo Dropout"""
+```
+
+**Implementation:** `mc_dropout_predict()` in [`src/models/uncertainty.py`](src/models/uncertainty.py)
+
+```python
+def mc_dropout_predict(
+    model: keras.Model,
+    x_data: np.ndarray,
+    n_iter: int = 20,
+) -> MCUncertaintySummary:
+    """Estimates uncertainty via Monte Carlo Dropout.
+
+    Performs stochastic forward passes with dropout enabled during inference
+    to estimate epistemic uncertainty.
+
+    Returns:
+        MCUncertaintySummary containing:
+        - mean_probabilities: Average predictions across iterations
+        - variance_probabilities: Prediction variance
+        - predicted_labels: Final predicted classes
+        - max_probabilities: Maximum confidence per sample
+        - predictive_entropy: Uncertainty measure
+    """
+    predictions = []
+    inputs = tf.convert_to_tensor(x_data, dtype=tf.float32)
+    for _ in range(n_iter):
+        probs = model(inputs, training=True).numpy()
+        predictions.append(probs)
+
+    stacked = np.stack(predictions, axis=0)
+    mean_probs = np.mean(stacked, axis=0)
+    variance_probs = np.var(stacked, axis=0)
+    predicted_labels = np.argmax(mean_probs, axis=1)
+    max_probabilities = np.max(mean_probs, axis=1)
+    predictive_entropy = -np.sum(mean_probs * np.log(mean_probs + 1e-12), axis=1)
+
+    return MCUncertaintySummary(...)
+```
+
+**Usage:** Used in Task 3 (MLP with Uncertainty) to quantify model uncertainty. Critical for identifying cases where the model is unsure and human review is needed.
+
+### 4. **Create Decision Report**
+
+**Specification:**
+
+```python
+def creer_rapport_decision(patient_id, prediction, confiance):
+    """Generates formatted report"""
+```
+
+**Implementation:** `creer_rapport_decision()` in [`src/reporting/report_generator.py`](src/reporting/report_generator.py)
+
+```python
+def creer_rapport_decision(
+    patient_id: str, prediction: ClinicalDecision, confiance: float
+) -> str:
+    """Generates a formatted text report for a patient.
+
+    Creates a comprehensive clinical report including:
+    - Patient identification and timestamp
+    - Primary prediction with confidence level
+    - Probability scores for all classes
+    - Clinical recommendations and actions
+    - Priority level for triage
+    - Safety alerts if applicable
+    - Special attention items (e.g., malignant tumor)
+
+    Returns:
+        Multi-line formatted text report ready for clinical use
+    """
+    scores = sorted(prediction.probabilites.items(),
+                    key=lambda x: x[1], reverse=True)
+
+    lines = [
+        "========================================",
+        "CLINICAL DECISION SUPPORT REPORT",
+        "========================================",
+        f"Patient ID: {patient_id} Date: {format_date_fr()}",
+        "",
+        "PRIMARY PREDICTION",
+        "---",
+        f"Class: {to_clinical_label(prediction.classe_predite)}",
+        f"Confidence: {confiance:.1%}",
+        f"Certainty Level: {prediction.niveau_confiance}",
+        # ... additional sections ...
+    ]
+    return "\n".join(lines)
+```
+
+**Usage:** Generates reports displayed in the dashboard and exported to text/PDF format. Called whenever a clinical decision needs documentation.
 
 ---
 
