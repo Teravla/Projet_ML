@@ -84,6 +84,9 @@ def determiner_priorite(
     Returns:
         Priorité: URGENTE, ELEVEE, NORMALE, ou ROUTINE
     """
+    if gravites is None:
+        gravites = {}
+
     # Règle 1: Alerte de sécurité = priorité urgente
     if decision.alerte_securite:
         return PriorityLevel.PRIORITY_URGENTE

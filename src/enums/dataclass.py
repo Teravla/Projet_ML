@@ -5,7 +5,7 @@ from typing import Optional
 import keras
 import numpy as np
 
-from src.enums.enums import ConfidenceLevel, CostReview, TumorType
+from src.enums.enums import CostReview, TumorType
 
 
 @dataclass(frozen=True)
@@ -23,10 +23,10 @@ class EvalBundleT3:
 class DecisionThresholds:
     """Ensemble des seuils pour le moteur de décision."""
 
-    haute: float = ConfidenceLevel.CONFIDENCE_HAUTE
-    moyenne: float = ConfidenceLevel.CONFIDENCE_MOYENNE
-    faible: float = ConfidenceLevel.CONFIDENCE_FAIBLE
-    securite_negatif: float = ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
+    haute: float = 0.85
+    moyenne: float = 0.65
+    faible: float = 0.50
+    securite_negatif: float = 0.95
 
 
 @dataclass(frozen=True)
@@ -213,6 +213,14 @@ class ModelState:
     model_path: Optional[str] = None
     last_decisions: Optional[list] = None
     last_true_labels: Optional[list] = None
+
+    def __getitem__(self, key: str):
+        """Compatibilité avec l'ancien usage dict-like (MODEL_STATE["key"])."""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value) -> None:
+        """Compatibilité avec l'ancien usage dict-like (MODEL_STATE["key"] = value)."""
+        setattr(self, key, value)
 
 
 @dataclass

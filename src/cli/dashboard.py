@@ -181,7 +181,7 @@ def generate_decisions_from_model(n_cases: int = 120) -> list:
 
     try:
         decisions, true_labels = generate_model_predictions(n_cases)
-    except (ValueError, TypeError, KeyError) as e:
+    except (ValueError, TypeError, KeyError, AttributeError) as e:
         print(f"[ERROR] Erreur génération décisions: {str(e)}")
         traceback.print_exc()
         return generate_decisions_simulated(n_cases)
