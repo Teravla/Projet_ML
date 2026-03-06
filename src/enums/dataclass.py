@@ -5,7 +5,6 @@ from typing import Optional
 import keras
 import numpy as np
 
-from src.data.pipeline import TrainValTestData
 from src.enums.enums import ConfidenceLevel, CostReview, TumorType
 
 
@@ -77,6 +76,18 @@ class TrainingConfig:
 
     epochs: int = 100
     batch_size: int = 16
+
+
+@dataclass(frozen=True)
+class TrainValTestData:
+    """Conteneur standard pour les tenseurs train/val/test."""
+
+    x_train: np.ndarray
+    x_val: np.ndarray
+    y_train: np.ndarray
+    y_val: np.ndarray
+    x_test: np.ndarray
+    y_test: np.ndarray
 
 
 @dataclass(frozen=True)
@@ -211,18 +222,6 @@ class CostParameters:
     faux_negatif: int = CostReview.COUT_FAUX_NEGATIF
     faux_positif: int = CostReview.COUT_FAUX_POSITIF
     revision: int = CostReview.COUT_REVISION_HUMAINE
-
-
-@dataclass(frozen=True)
-class TrainValTestData:
-    """Conteneur standard pour les tenseurs train/val/test."""
-
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
 
 
 @dataclass(frozen=True)
