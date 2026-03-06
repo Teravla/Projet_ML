@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """API Flask pour le dashboard SAD.
 
 Lance un serveur web qui expose les donnees du pipeline SAD en JSON.
@@ -21,46 +20,22 @@ from flask import Flask, jsonify, request, make_response
 from src.decision.engine import count_confidence_levels, generer_recommandation
 from src.decision.rules import appliquer_regle_securite_negatif
 from src.decision.triage import appliquer_triage
+from src.enums.dataclass import ModelState
+from src.enums.enums import (
+    ConfidenceLevel,
+    HyperParametersInt,
+    PriorityLevel,
+    TumorType,
+)
 from src.evaluation.analysis import analyser_performance_sad
 from src.data.loader import load_dataset_split
 from src.reporting.report_generator import creer_rapport_decision
 
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
 app = Flask(__name__, static_folder=str(PROJECT_ROOT / "web"), static_url_path="")
-
-CLASSES = ["glioma", "meningioma", "notumor", "pituitary"]
-RNG = np.random.default_rng(42)
-
-# Confidence level constants
-CONFIDENCE_HAUTE = "HAUTE"
-CONFIDENCE_MOYENNE = "MOYENNE"
-CONFIDENCE_FAIBLE = "FAIBLE"
-CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
-
-# Priority constants
-PRIORITY_URGENTE = "URGENTE"
-PRIORITY_ELEVEE = "Elevee"
-PRIORITY_ELEVEE_ACCENT = "Élevée"
-PRIORITY_NORMALE = "Normale"
-PRIORITY_ROUTINE = "Routine"
-
-# Class name constant
-CLASS_NO_TUMOR = "notumor"
-
-# Global model state
-MODEL_STATE = {
-    "model": None,
-    "test_images": None,
-    "test_labels": None,
-    "class_names": CLASSES,
-    "model_loaded": False,
-    "error_message": None,
-    "model_path": None,
-    "last_decisions": None,  # Cache des dernières décisions générées
-    "last_true_labels": None,  # Cache des vrais labels correspondants
-}
+RNG = np.random.default_rng(HyperParametersInt.RANGE)
+MODEL_STATE = ModelState()
 
 
 def find_latest_model() -> Optional[Path]:
@@ -229,7 +204,9 @@ def generate_decisions_simulated(n_cases: int = 120):
     decisions = []
     for i in range(n_cases):
         pid = f"P_{i+1:05d}"
-        d = generer_recommandation(probas[i], CLASSES, patient_id=pid)
+        d = generer_recommandation(
+            probas[i], list(TumorType.__members__.keys()), patient_id=pid
+        )
         d = appliquer_regle_securite_negatif(d)
         d = appliquer_triage(d)
         decisions.append(d)
@@ -375,19 +352,26 @@ def api_stats():
 
     n_total = len(decisions)
     confidence_counts = count_confidence_levels(decisions)
-    n_haute = confidence_counts[CONFIDENCE_HAUTE]
-    n_moyenne = confidence_counts[CONFIDENCE_MOYENNE]
-    n_faible = confidence_counts[CONFIDENCE_FAIBLE]
-    n_tres_faible = confidence_counts[CONFIDENCE_TRES_FAIBLE]
+    n_haute = confidence_counts[ConfidenceLevel.CONFIDENCE_HAUTE]
+    n_moyenne = confidence_counts[ConfidenceLevel.CONFIDENCE_MOYENNE]
+    n_faible = confidence_counts[ConfidenceLevel.CONFIDENCE_FAIBLE]
+    n_tres_faible = confidence_counts[ConfidenceLevel.CONFIDENCE_TRES_FAIBLE]
 
-    n_urgente = sum(1 for d in decisions if PRIORITY_URGENTE in d.priorite)
+    n_urgente = sum(
+        1 for d in decisions if PriorityLevel.PRIORITY_URGENTE in d.priorite
+    )
     n_elevee = sum(
         1
         for d in decisions
-        if PRIORITY_ELEVEE in d.priorite or PRIORITY_ELEVEE_ACCENT in d.priorite
+        if PriorityLevel.PRIORITY_ELEVEE in d.priorite
+        or PriorityLevel.PRIORITY_ELEVEE_ACCENT in d.priorite
     )
-    n_normale = sum(1 for d in decisions if PRIORITY_NORMALE in d.priorite)
-    n_routine = sum(1 for d in decisions if PRIORITY_ROUTINE in d.priorite)
+    n_normale = sum(
+        1 for d in decisions if PriorityLevel.PRIORITY_NORMALE in d.priorite
+    )
+    n_routine = sum(
+        1 for d in decisions if PriorityLevel.PRIORITY_ROUTINE in d.priorite
+    )
 
     n_alertes = sum(1 for d in decisions if d.alerte_securite)
     n_revisions = sum(1 for d in decisions if d.revision_requise)
@@ -535,7 +519,7 @@ def draw_pdf_attention(
         c.drawString(50, y_pos, "• [ALERTE] Revision obligatoire detectee")
         y_pos -= line_height
 
-    if decision.classe_predite != CLASS_NO_TUMOR:
+    if decision.classe_predite != TumorType.NOTUMOR:
         c.drawString(50, y_pos, "• Tumeur suspecte detectee")
         y_pos -= line_height
         c.drawString(50, y_pos, "• IRM de controle recommandee")

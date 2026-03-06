@@ -1,22 +1,7 @@
-#!/usr/bin/env python3
-"""Display formatted help for available tasks with colors."""
+"""
+Display formatted help for available tasks with colors."""
 
-
-from enum import StrEnum
-
-
-class Colors(StrEnum):
-    """ANSI color codes for terminal output."""
-
-    HEADER = "\033[95m"  # Magenta
-    BLUE = "\033[94m"  # Blue
-    CYAN = "\033[96m"  # Cyan
-    GREEN = "\033[92m"  # Green
-    YELLOW = "\033[93m"  # Yellow
-    RED = "\033[91m"  # Red
-    ENDC = "\033[0m"  # Reset
-    BOLD = "\033[1m"  # Bold
-    UNDERLINE = "\033[4m"  # Underline
+from src.enums.enums import Colors
 
 
 def display_help():

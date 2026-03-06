@@ -3,23 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 from pathlib import Path
 from src.data.augment import augment_batch, create_training_augmenter
 from src.data.loader import load_dataset_split, summarize_split
 from src.data.preprocess import preprocess_dataset
-
-
-@dataclass(frozen=True)
-class PreprocessResult:
-    """Contient les sorties utiles du preprocessing."""
-
-    train_images_shape: tuple[int, ...]
-    train_labels_shape: tuple[int, ...]
-    test_images_shape: tuple[int, ...]
-    test_labels_shape: tuple[int, ...]
-    augmented_shape: tuple[int, ...]
-    class_names: list[str]
+from src.enums.dataclass import PreprocessResult
 
 
 def parse_args() -> argparse.Namespace:

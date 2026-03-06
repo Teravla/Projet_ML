@@ -5,13 +5,13 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 from pathlib import Path
 import numpy as np
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from src.data.loader import load_dataset_split
 from src.data.preprocess import preprocess_dataset
+from src.enums.dataclass import DataBundleT4, EvalBundleT4, RuntimeConfigT4
 from src.models.calibration import (
     TemperatureScaler,
     analyze_uncertain_predictions,
@@ -27,39 +27,7 @@ from src.models.cnn import (
 )
 
 
-@dataclass(frozen=True)
-class RuntimeConfig:
-    """Paramètres effectifs d'exécution de la tâche 4."""
 
-    img_size: int
-    epochs: int
-    batch_size: int
-    ts_epochs: int
-    mode: str
-
-
-@dataclass(frozen=True)
-class DataBundle:
-    """Données préparées pour entraînement/évaluation CNN."""
-
-    x_train: np.ndarray
-    x_val: np.ndarray
-    y_train: np.ndarray
-    y_val: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
-    class_names: list[str]
-
-
-@dataclass(frozen=True)
-class EvalBundle:
-    """Résultats d'évaluation du CNN calibré."""
-
-    acc_base: float
-    acc_calibrated: float
-    temperature: float
-    confidence_stats: dict[str, float]
-    uncertain_stats: dict[str, float]
 
 
 def parse_args() -> argparse.Namespace:
@@ -89,7 +57,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
+def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfigT4:
     """Construit la configuration effective (FAST/STD)."""
     img_size = args.img_size
     epochs = args.epochs
@@ -104,7 +72,7 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
         batch_size = max(batch_size, 128)
         ts_epochs = min(ts_epochs, 100)
 
-    return RuntimeConfig(
+    return RuntimeConfigT4(
         img_size=img_size,
         epochs=epochs,
         batch_size=batch_size,
@@ -113,7 +81,7 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
     )
 
 
-def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
+def load_data_bundle(data_dir: str, runtime: RuntimeConfigT4) -> DataBundleT4:
     """Charge et prépare les données train/val/test."""
     train_dir = Path(data_dir) / "Training"
     test_dir = Path(data_dir) / "Testing"
@@ -147,7 +115,7 @@ def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
         stratify=y_train_all,
     )
 
-    return DataBundle(
+    return DataBundleT4(
         x_train=x_train,
         x_val=x_val,
         y_train=y_train,
@@ -159,9 +127,9 @@ def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
 
 
 def train_cnn_model(
-    data: DataBundle,
+    data: DataBundleT4,
     args: argparse.Namespace,
-    runtime: RuntimeConfig,
+    runtime: RuntimeConfigT4,
 ) -> object:
     """Construit et entraîne le CNN."""
     model = build_cnn_classifier(
@@ -188,10 +156,10 @@ def train_cnn_model(
 
 def evaluate_calibrated_cnn(
     model: object,
-    data: DataBundle,
+    data: DataBundleT4,
     args: argparse.Namespace,
-    runtime: RuntimeConfig,
-) -> tuple[EvalBundle, TemperatureScaler, np.ndarray]:
+    runtime: RuntimeConfigT4,
+) -> tuple[EvalBundleT4, TemperatureScaler, np.ndarray]:
     """Évalue le CNN avant/après calibration par température."""
     probs_base = predict_probabilities(model, data.x_test)
     acc_base = accuracy_score(data.y_test, np.argmax(probs_base, axis=1))
@@ -212,7 +180,7 @@ def evaluate_calibrated_cnn(
     acc_calibrated = accuracy_score(data.y_test, np.argmax(probs_calibrated, axis=1))
     max_prob = np.max(probs_calibrated, axis=1)
 
-    eval_bundle = EvalBundle(
+    eval_bundle = EvalBundleT4(
         acc_base=acc_base,
         acc_calibrated=acc_calibrated,
         temperature=temp_scaler.temperature,
@@ -227,9 +195,9 @@ def evaluate_calibrated_cnn(
 
 def save_activations(
     model: object,
-    data: DataBundle,
+    data: DataBundleT4,
     args: argparse.Namespace,
-    runtime: RuntimeConfig,
+    runtime: RuntimeConfigT4,
 ) -> tuple[Path, list[str], dict[str, np.ndarray], int]:
     """Extrait et sauvegarde les activations intermédiaires."""
     activation_count = min(args.activation_samples, data.x_test.shape[0])

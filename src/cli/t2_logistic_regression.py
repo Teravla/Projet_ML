@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import numpy as np
 from sklearn.metrics import accuracy_score
 
 from src.data.pipeline import load_preprocessed_train_test
+from src.enums.dataclass import DatasetBundle, RuntimeConfigT2
 from src.models.calibration import (
     analyze_uncertain_predictions,
     calibrate_classifier,
@@ -18,27 +18,6 @@ from src.models.log_reg import (
     predict_with_confidence,
     train_logistic_regression,
 )
-
-
-@dataclass(frozen=True)
-class RuntimeConfig:
-    """Paramètres effectifs d'exécution."""
-
-    img_size: int
-    max_iter: int
-    cv: int
-    mode: str
-
-
-@dataclass(frozen=True)
-class DatasetBundle:
-    """Données preprocessées pour la tâche 2."""
-
-    x_train_flat: np.ndarray
-    y_train: np.ndarray
-    x_test_flat: np.ndarray
-    y_test: np.ndarray
-    class_names: list[str]
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
+def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfigT2:
     """Construit la configuration effective (FAST/STD)."""
     img_size = args.img_size
     max_iter = args.max_iter
@@ -79,10 +58,10 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
         max_iter = min(max_iter, 200)
         cv = min(cv, 2)
 
-    return RuntimeConfig(img_size=img_size, max_iter=max_iter, cv=cv, mode=mode)
+    return RuntimeConfigT2(img_size=img_size, max_iter=max_iter, cv=cv, mode=mode)
 
 
-def load_dataset_bundle(data_dir: str, runtime: RuntimeConfig) -> DatasetBundle:
+def load_dataset_bundle(data_dir: str, runtime: RuntimeConfigT2) -> DatasetBundle:
     """Charge et preprocess les données train/test."""
     image_size = (runtime.img_size, runtime.img_size)
 
@@ -104,7 +83,7 @@ def load_dataset_bundle(data_dir: str, runtime: RuntimeConfig) -> DatasetBundle:
 
 def run_logreg_pipeline(
     bundle: DatasetBundle,
-    runtime: RuntimeConfig,
+    runtime: RuntimeConfigT2,
     calibration_method: str,
     uncertainty_threshold: float,
 ) -> tuple[float, float, dict[str, float], dict[str, float]]:

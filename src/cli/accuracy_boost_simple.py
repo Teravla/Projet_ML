@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 from pathlib import Path
 
 import keras
@@ -16,61 +15,11 @@ from src.cli.accuracy_boost import (
     prepare_data as prepare_data_common,
     print_classification_summary,
 )
+from src.enums.dataclass import AppConfig, EvalBundle, SweepConfig, TrainConfig
+from src.enums.enums import HyperParametersInt, ModelType
 from src.models.utils import compile_logits_classifier
 from src.models.cnn import build_cnn_classifier
 from src.models.mlp import build_mlp_classifier
-
-NUM_CLASSES = 4
-TARGET_ACCURACY = 0.90
-
-# Model type identifiers
-MODEL_TYPE_CNN = "cnn"
-MODEL_TYPE_MLP = "mlp"
-MODEL_TYPE_TRANSFER = "transfer"
-
-# Evaluation thresholds
-ENSEMBLE_THRESHOLD = 0.5
-
-
-@dataclass(frozen=True)
-class TrainConfig:
-    """Configuration d'entrainement generique."""
-
-    epochs: int
-    batch_size: int
-
-
-@dataclass(frozen=True)
-class SweepConfig:
-    """Configuration du sweep CNN."""
-
-    trials: int
-    epochs: int
-    final_train: bool
-    final_epochs: int
-    batch_size: int
-    use_tta: bool
-
-
-@dataclass(frozen=True)
-class AppConfig:
-    """Configuration globale de l'application."""
-
-    img_size: tuple[int, int]
-    use_optimized: bool
-    use_ensemble: bool
-    use_tta: bool
-    use_focal: bool
-    active_models: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class EvalBundle:
-    """Resultat d'evaluation final."""
-
-    y_pred_final: np.ndarray
-    final_accuracy: float
-    per_model_accuracy: dict[str, float]
 
 
 def parse_args() -> argparse.Namespace:
@@ -154,7 +103,7 @@ def parse_args() -> argparse.Namespace:
 
 def build_transfer_learning_model(
     input_shape: tuple[int, int, int],
-    num_classes: int = NUM_CLASSES,
+    num_classes: int = HyperParametersInt.NUM_CLASSES,
     learning_rate: float = 5e-5,
 ) -> keras.Model:
     """Transfer learning avec EfficientNetB0."""
@@ -337,7 +286,7 @@ def run_cnn_sweep(
 
         model = build_cnn_classifier(
             data.x_train.shape[1:],
-            num_classes=NUM_CLASSES,
+            num_classes=HyperParametersInt.NUM_CLASSES,
             dropout_rate=float(cfg["dropout"]),
             learning_rate=float(cfg["lr"]),
         )
@@ -403,7 +352,7 @@ def train_cnn_pipeline(
             keras.backend.clear_session()
             cnn_model = build_cnn_classifier(
                 data.x_train.shape[1:],
-                num_classes=NUM_CLASSES,
+                num_classes=HyperParametersInt.NUM_CLASSES,
                 dropout_rate=float(best_cfg["dropout"]),
                 learning_rate=float(best_cfg["lr"]),
             )
@@ -429,7 +378,7 @@ def train_cnn_pipeline(
     print("\nEntrainement du CNN (mode standard)...")
     cnn_model = build_cnn_classifier(
         data.x_train.shape[1:],
-        num_classes=NUM_CLASSES,
+        num_classes=HyperParametersInt.NUM_CLASSES,
         dropout_rate=0.3,
         learning_rate=1e-3 if app_cfg.use_optimized else 1e-3,
     )
@@ -458,7 +407,7 @@ def train_mlp_pipeline(data: PreparedData, train_cfg: TrainConfig) -> keras.Mode
 
     mlp_model = build_mlp_classifier(
         input_dim=x_train_flat.shape[1],
-        num_classes=NUM_CLASSES,
+        num_classes=HyperParametersInt.NUM_CLASSES,
         dropout_rate=0.4,
     )
     early_stopping = keras.callbacks.EarlyStopping(
@@ -513,10 +462,10 @@ def predict_logits(
 ) -> np.ndarray:
     """Retourne les logits adaptes selon le type de modele."""
 
-    if model_name == MODEL_TYPE_MLP:
+    if model_name == ModelType.MLP:
         x_input = x_test.reshape(x_test.shape[0], -1)
         return model.predict(x_input, verbose=0)
-    if use_tta and model_name == MODEL_TYPE_CNN:
+    if use_tta and model_name == ModelType.CNN:
         return predict_with_tta(model, x_test, tta_rounds=5)
     return model.predict(x_test, verbose=0)
 
@@ -569,7 +518,9 @@ def ensemble_or_best(
 
     if use_ensemble and len(logits_by_model) > 1:
         valid_names = [
-            name for name, acc in accuracy_by_model.items() if acc > ENSEMBLE_THRESHOLD
+            name
+            for name, acc in accuracy_by_model.items()
+            if acc > HyperParametersInt.ENSEMBLE_THRESHOLD
         ]
         if len(valid_names) > 1:
             raw_weights = [accuracy_by_model[name] ** 2 for name in valid_names]
@@ -581,7 +532,9 @@ def ensemble_or_best(
                 print(f"{name.upper()}={weight:.3f} ", end="")
             print()
 
-            ensemble_logits = np.zeros((y_test.shape[0], NUM_CLASSES))
+            ensemble_logits = np.zeros(
+                (y_test.shape[0], HyperParametersInt.NUM_CLASSES)
+            )
             for name, weight in zip(valid_names, weights):
                 ensemble_logits += weight * logits_by_model[name]
 
@@ -597,7 +550,7 @@ def print_goal(final_accuracy: float) -> None:
     """Affiche l'atteinte ou non de l'objectif."""
 
     print("\n" + "=" * 70)
-    if final_accuracy > TARGET_ACCURACY:
+    if final_accuracy > HyperParametersInt.TARGET_ACCURACY:
         print(f"OBJECTIF ATTEINT! Accuracy: {final_accuracy*100:.2f}% > 90%")
         return
 
@@ -692,21 +645,19 @@ def train_selected_models(
 
     trained: dict[str, keras.Model] = {}
 
-    if MODEL_TYPE_CNN in app_cfg.active_models:
+    if ModelType.CNN in app_cfg.active_models:
         print("\n[2/5] Pipeline CNN...")
-        trained[MODEL_TYPE_CNN] = train_cnn_pipeline(
-            data, app_cfg, train_cfg, sweep_cfg
-        )
+        trained[ModelType.CNN] = train_cnn_pipeline(data, app_cfg, train_cfg, sweep_cfg)
 
-    if MODEL_TYPE_MLP in app_cfg.active_models:
+    if ModelType.MLP in app_cfg.active_models:
         print("\n[3/5] Entrainement MLP...")
-        trained[MODEL_TYPE_MLP] = train_mlp_pipeline(data, train_cfg)
+        trained[ModelType.MLP] = train_mlp_pipeline(data, train_cfg)
 
-    if MODEL_TYPE_TRANSFER in app_cfg.active_models:
+    if ModelType.TRANSFER in app_cfg.active_models:
         print("\n[4/5] Entrainement Transfer Learning...")
         transfer_model = train_transfer_pipeline(data, train_cfg)
         if transfer_model is not None:
-            trained[MODEL_TYPE_TRANSFER] = transfer_model
+            trained[ModelType.TRANSFER] = transfer_model
 
     return trained
 

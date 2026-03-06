@@ -24,37 +24,9 @@ from src.data.pipeline import (
     load_train_test_splits,
     split_train_validation,
 )
+from src.enums.dataclass import EvaluationResult, PreparedData, TrainingConfig
+from src.enums.enums import HyperParametersInt
 from src.models.utils import compile_logits_classifier
-
-TARGET_ACCURACY = 0.90
-BASELINE_ACCURACY_PERCENT = 28.33
-NUM_CLASSES = 4
-
-
-@dataclass(frozen=True)
-class TrainingConfig:
-    """Configuration d'entraînement des modèles."""
-
-    epochs: int = 100
-    batch_size: int = 16
-
-
-@dataclass(frozen=True)
-class PreparedData(TrainValTestData):
-    """Données préparées pour l'entraînement et l'évaluation."""
-
-    class_names: list[str]
-
-
-@dataclass(frozen=True)
-class EvaluationResult:
-    """Résultats consolidés d'évaluation."""
-
-    y_pred_ensemble: np.ndarray
-    acc_cnn: float
-    acc_transfer: float | None
-    acc_ensemble: float
-    model_transfer: keras.Model | None
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,7 +45,7 @@ def parse_args() -> argparse.Namespace:
 
 def build_improved_cnn(
     input_shape: tuple[int, int, int],
-    num_classes: int = NUM_CLASSES,
+    num_classes: int = HyperParametersInt.NUM_CLASSES,
     learning_rate: float = 1e-4,
 ) -> keras.Model:
     """CNN amélioré avec batch norm, skip connections et regularization."""
@@ -129,7 +101,7 @@ def build_improved_cnn(
 
 def build_transfer_learning_model(
     input_shape: tuple[int, int, int],
-    num_classes: int = NUM_CLASSES,
+    num_classes: int = HyperParametersInt.NUM_CLASSES,
     learning_rate: float = 1e-4,
 ) -> keras.Model:
     """Transfer learning avec EfficientNetB0."""
@@ -220,7 +192,7 @@ def ensemble_predict(
     if weights is None:
         weights = [1.0 / len(models)] * len(models)
 
-    ensemble_logits = np.zeros((x_data.shape[0], NUM_CLASSES))
+    ensemble_logits = np.zeros((x_data.shape[0], HyperParametersInt.NUM_CLASSES))
     for model, weight in zip(models, weights):
         logits = model.predict(x_data, verbose=0)
         ensemble_logits += weight * logits
@@ -353,14 +325,14 @@ def print_goal_status(acc_ensemble: float) -> None:
     """Affiche l'état d'atteinte de l'objectif d'accuracy."""
 
     print("\n" + "=" * 70)
-    if acc_ensemble > TARGET_ACCURACY:
+    if acc_ensemble > HyperParametersInt.TARGET_ACCURACY:
         print(f"OBJECTIF ATTEINT! Accuracy: {acc_ensemble*100:.2f}% > 90%")
         return
 
-    improvement = (acc_ensemble * 100) - BASELINE_ACCURACY_PERCENT
+    improvement = (acc_ensemble * 100) - HyperParametersInt.BASELINE_ACCURACY_PERCENT
     print(
         f"Amélioration: +{improvement:.2f}% "
-        f"({BASELINE_ACCURACY_PERCENT:.2f}% -> {acc_ensemble*100:.2f}%)"
+        f"({HyperParametersInt.BASELINE_ACCURACY_PERCENT:.2f}% -> {acc_ensemble*100:.2f}%)"
     )
     print("   Objectif: >90%")
 

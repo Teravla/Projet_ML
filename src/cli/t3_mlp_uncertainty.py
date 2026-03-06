@@ -11,6 +11,7 @@ from src.data.pipeline import (
     load_preprocessed_train_test,
     split_train_validation,
 )
+from src.enums.dataclass import RuntimeConfigT3
 from src.models.log_reg import flatten_images
 from src.models.mlp import (
     MLPTrainingConfig,
@@ -20,18 +21,6 @@ from src.models.mlp import (
     train_mlp_classifier,
 )
 from src.models.uncertainty import mc_dropout_predict, summarize_uncertainty
-
-
-@dataclass(frozen=True)
-class RuntimeConfig:
-    """Paramètres effectifs d'exécution de la tâche 3."""
-
-    img_size: int
-    epochs: int
-    batch_size: int
-    n_iter: int
-    hidden_units: tuple[int, int]
-    mode: str
 
 
 DataBundle = TrainValTestData
@@ -69,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
+def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfigT3:
     """Construit la configuration effective (FAST/STD)."""
     img_size = args.img_size
     epochs = args.epochs
@@ -86,7 +75,7 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
         n_iter = min(n_iter, 10)
         hidden_units = (128, 64)
 
-    return RuntimeConfig(
+    return RuntimeConfigT3(
         img_size=img_size,
         epochs=epochs,
         batch_size=batch_size,
@@ -96,7 +85,7 @@ def resolve_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
     )
 
 
-def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
+def load_data_bundle(data_dir: str, runtime: RuntimeConfigT3) -> DataBundle:
     """Charge et prépare les données pour la tâche 3."""
     image_size = (runtime.img_size, runtime.img_size)
 
@@ -118,7 +107,7 @@ def load_data_bundle(data_dir: str, runtime: RuntimeConfig) -> DataBundle:
 def train_and_evaluate(
     data: DataBundle,
     args: argparse.Namespace,
-    runtime: RuntimeConfig,
+    runtime: RuntimeConfigT3,
 ) -> EvalBundle:
     """Entraîne le MLP puis évalue performance et incertitude."""
     model = build_mlp_classifier(

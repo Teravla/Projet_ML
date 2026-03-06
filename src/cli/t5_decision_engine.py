@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Script runner pour la Tâche 5 : Moteur de Décision Clinique.
 
 Ce script démontre le fonctionnement du SAD (Système d'Aide à la Décision)
@@ -12,7 +11,6 @@ Usage:
 """
 
 import argparse
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -39,26 +37,11 @@ from src.decision.triage import (
     statistiques_triage,
 )
 from src.config.thresholds import DecisionThresholds
+from src.enums.dataclass import RuntimeConfigT5
+from src.enums.enums import ConfidenceLevel, HyperParametersStr, ModelType
 from src.models.cnn import build_cnn_classifier
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-MODEL_LOGREG = "logreg"
-MODEL_MLP = "mlp"
-MODEL_CNN = "cnn"
-CONFIDENCE_HAUTE = "HAUTE"
-CONFIDENCE_TRES_FAIBLE = "TRES_FAIBLE"
-URGENT_QUEUE_KEY = "URGENTE (12h)"
-
-
-@dataclass(frozen=True)
-class RuntimeConfig:
-    """Configuration d'exécution de la tâche 5."""
-
-    img_size: int
-    n_samples_max: int | None
-    data_path: Path
-    seuils: DecisionThresholds
 
 
 def parse_args() -> argparse.Namespace:
@@ -132,7 +115,7 @@ def charger_modele(
     Dans un contexte réel, on chargerait un modèle pré-entraîné depuis artifacts/.
     """
 
-    if model_type == MODEL_LOGREG:
+    if model_type == ModelType.LOGISTIC_REGRESSION:
         # Simuler un modèle logistique simple
         model = keras.Sequential(
             [
@@ -143,7 +126,7 @@ def charger_modele(
         model.compile(
             optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"]
         )
-    elif model_type == MODEL_MLP:
+    elif model_type == ModelType.MLP:
         model = keras.Sequential(
             [
                 keras.layers.Flatten(input_shape=input_shape),
@@ -193,7 +176,7 @@ def afficher_exemple_decision(decision, idx: int = None):
     print(f"Révision requise    : {'OUI' if decision.revision_requise else 'NON'}")
 
     if decision.alerte_securite:
-        print("\n⚠️  ALERTE SECURITE : Risque de faux négatif détecté!")
+        print("\n  ALERTE SECURITE : Risque de faux négatif détecté!")
 
     print("\nScores par classe:")
     for classe, prob in sorted(
@@ -213,7 +196,7 @@ def print_execution_header(args: argparse.Namespace) -> None:
     print(f"Type de modèle   : {args.model.upper()}")
 
 
-def build_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
+def build_runtime_config(args: argparse.Namespace) -> RuntimeConfigT5:
     """Construit la configuration runtime et affiche le mode."""
     img_size = min(args.img_size, 32) if args.fast else args.img_size
     n_samples_max = (args.n_samples or 200) if args.fast else args.n_samples
@@ -226,7 +209,7 @@ def build_runtime_config(args: argparse.Namespace) -> RuntimeConfig:
         faible=args.seuil_faible,
     )
     data_path = Path(args.data_path) if args.data_path else PROJECT_ROOT / "data"
-    return RuntimeConfig(
+    return RuntimeConfigT5(
         img_size=img_size,
         n_samples_max=n_samples_max,
         data_path=data_path,
@@ -244,7 +227,7 @@ def print_thresholds(seuils: DecisionThresholds) -> None:
 
 
 def load_and_preprocess_test_data(
-    config: RuntimeConfig,
+    config: RuntimeConfigT5,
 ) -> tuple[np.ndarray, np.ndarray, list[str]]:
     """Charge et preprocess les données de test."""
     print("\n" + "-" * 70)
@@ -312,7 +295,7 @@ def train_and_predict(
             validation_split=0.2,
         )
     else:
-        print("⚠️ Mode complet : entraînement de 10 epochs...")
+        print(" Mode complet : entraînement de 10 epochs...")
         model.fit(
             x_test,
             y_test_labels,
@@ -406,9 +389,9 @@ def print_examples(decisions: list[Any], files_attente: dict[str, list[Any]]) ->
     print("ETAPE 6 : Exemples de décisions cliniques")
     print("-" * 70)
 
-    if files_attente.get(URGENT_QUEUE_KEY):
+    if files_attente.get(HyperParametersStr.URGENT_QUEUE_KEY):
         print("\n>>> EXEMPLE 1 : Cas URGENT")
-        afficher_exemple_decision(files_attente[URGENT_QUEUE_KEY][0], idx=1)
+        afficher_exemple_decision(files_attente[HyperParametersStr.URGENT_QUEUE_KEY][0], idx=1)
 
     cas_alertes = [decision for decision in decisions if decision.alerte_securite]
     if cas_alertes:
@@ -418,7 +401,7 @@ def print_examples(decisions: list[Any], files_attente: dict[str, list[Any]]) ->
     cas_haute_confiance = [
         decision
         for decision in decisions
-        if decision.niveau_confiance == CONFIDENCE_HAUTE
+        if decision.niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE
     ]
     if cas_haute_confiance:
         print("\n>>> EXEMPLE 3 : Cas HAUTE CONFIANCE")
@@ -427,7 +410,7 @@ def print_examples(decisions: list[Any], files_attente: dict[str, list[Any]]) ->
     cas_incertains = [
         decision
         for decision in decisions
-        if decision.niveau_confiance == CONFIDENCE_TRES_FAIBLE
+        if decision.niveau_confiance == ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
     ]
     if cas_incertains:
         print("\n>>> EXEMPLE 4 : Cas TRES INCERTAIN")

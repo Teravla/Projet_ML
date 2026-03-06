@@ -15,20 +15,15 @@ import numpy as np
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import train_test_split
 from src.data.pipeline import load_train_test_splits
+from src.enums.enums import HyperParametersInt
 from src.models.cnn import build_cnn_classifier
-
-# Thresholds and constants
-IMBALANCE_THRESHOLD = 2.0
-NORMALIZATION_MAX = 1.5
-VARIANCE_THRESHOLD = 0.001
-IMAGE_NDIM = 4
 
 
 def analyze_class_distribution(
     y_train: np.ndarray, y_test: np.ndarray, class_names: list[str]
 ) -> None:
     """Analyse le déséquilibre des classes."""
-    print("\n📊 ANALYSE DE LA DISTRIBUTION DES CLASSES")
+    print("\n ANALYSE DE LA DISTRIBUTION DES CLASSES")
     print("=" * 70)
 
     unique, counts = np.unique(y_train, return_counts=True)
@@ -46,8 +41,8 @@ def analyze_class_distribution(
     # Ratio de déséquilibre
     train_counts = np.bincount(y_train)
     imbalance_ratio = train_counts.max() / train_counts.min()
-    print(f"\n⚠️  Ratio de déséquilibre: {imbalance_ratio:.2f}x")
-    if imbalance_ratio > IMBALANCE_THRESHOLD:
+    print(f"\n  Ratio de déséquilibre: {imbalance_ratio:.2f}x")
+    if imbalance_ratio > HyperParametersInt.IMBALANCE_THRESHOLD:
         print("    Solution: Utiliser class_weight dans le training")
 
 
@@ -118,34 +113,34 @@ def analyze_model_predictions(
 
 def diagnose_training_issues(x_train: np.ndarray) -> None:
     """Diagnostique les problèmes potentiels de données."""
-    print("\n⚙️  DIAGNOSTIC DES DONNÉES D'ENTRAÎNEMENT")
+    print("\n  DIAGNOSTIC DES DONNÉES D'ENTRAÎNEMENT")
     print("=" * 70)
 
     # Vérifier les valeurs
     print(f"\nRage de pixels: [{x_train.min():.4f}, {x_train.max():.4f}]")
-    if x_train.max() > NORMALIZATION_MAX or x_train.min() < -0.5:
-        print("  ⚠️  PROBLÈME: Les données ne sont pas normalisées [0,1] ou [-1,1]")
+    if x_train.max() > HyperParametersInt.NORMALIZATION_MAX or x_train.min() < -0.5:
+        print("    PROBLÈME: Les données ne sont pas normalisées [0,1] ou [-1,1]")
         print("     Solution: Diviser par 255 si données brutes")
     else:
-        print("  ✓ Données normalisées correctement")
+        print("   Données normalisées correctement")
 
     # Vérifier les NaN
     nan_count = np.isnan(x_train).sum()
     if nan_count > 0:
-        print(f"  ⚠️  PROBLÈME: {nan_count} valeurs NaN trouvées")
+        print(f"    PROBLÈME: {nan_count} valeurs NaN trouvées")
     else:
-        print("  ✓ Pas de valeurs NaN")
+        print("   Pas de valeurs NaN")
 
     # Variance
     variance = np.var(x_train)
     print(f"\nVariance globale: {variance:.6f}")
-    if variance < VARIANCE_THRESHOLD:
-        print("  ⚠️  PROBLÈME: Variance très faible (données constantes?)")
+    if variance < HyperParametersInt.VARIANCE_THRESHOLD:
+        print("    PROBLÈME: Variance très faible (données constantes?)")
     else:
-        print("  ✓ Variance acceptable")
+        print("   Variance acceptable")
 
     # Distribution par canal
-    if len(x_train.shape) == IMAGE_NDIM:  # Images (batch, H, W, C)
+    if len(x_train.shape) == HyperParametersInt.IMAGE_NDIM:  # Images (batch, H, W, C)
         print("\nMoyenne par canal:")
         for c in range(x_train.shape[-1]):
             mean_c = x_train[..., c].mean()
@@ -177,7 +172,7 @@ def load_and_prepare_data() -> (
         else np.array([test_split.class_names.index(label) for label in y_test_raw])
     )
 
-    print(f"✓ Train: {x_train.shape}, Test: {x_test.shape}")
+    print(f" Train: {x_train.shape}, Test: {x_test.shape}")
     return x_train, y_train, x_test, y_test, train_split.class_names
 
 
@@ -212,37 +207,37 @@ def print_recommendations() -> None:
         (
             "Architecture CNN",
             [
-                "✓ Ajouter BatchNormalization après chaque Conv2D",
-                "✓ Utiliser résiduel blocks (skip connections)",
-                "✓ Augmenter le nombre de filtres (64→256)",
-                "✓ Ajouter Global Average Pooling au lieu de Flatten",
+                " Ajouter BatchNormalization après chaque Conv2D",
+                " Utiliser résiduel blocks (skip connections)",
+                " Augmenter le nombre de filtres (64→256)",
+                " Ajouter Global Average Pooling au lieu de Flatten",
             ],
         ),
         (
             "Hyperparamétres",
             [
-                "✓ Augmenter epochs: 10 → 50-100",
-                "✓ Réduire batch_size: 64 → 16-32",
-                "✓ Utiliser learning rate schedule (ReduceLROnPlateau)",
-                "✓ Ajouter regularization (L2, Dropout 0.5)",
+                " Augmenter epochs: 10 → 50-100",
+                " Réduire batch_size: 64 → 16-32",
+                " Utiliser learning rate schedule (ReduceLROnPlateau)",
+                " Ajouter regularization (L2, Dropout 0.5)",
             ],
         ),
         (
             "Données",
             [
-                "✓ Augmenter la résolution: 64×64 → 128×128 ou 224×224",
-                "✓ Data augmentation: Flips, Rotations, Zoom, Translate",
-                "✓ Appliquer class_weight pour déséquilibre",
-                "✓ Utiliser image normalization (ImageNet mean/std)",
+                " Augmenter la résolution: 64×64 → 128×128 ou 224×224",
+                " Data augmentation: Flips, Rotations, Zoom, Translate",
+                " Appliquer class_weight pour déséquilibre",
+                " Utiliser image normalization (ImageNet mean/std)",
             ],
         ),
         (
             "Modèles",
             [
-                "✓ Transfer Learning: EfficientNetB0, ResNet50",
-                "✓ Ensemble voting de plusieurs modèles",
-                "✓ K-Fold Cross Validation",
-                "✓ Test Time Augmentation (TTA)",
+                " Transfer Learning: EfficientNetB0, ResNet50",
+                " Ensemble voting de plusieurs modèles",
+                " K-Fold Cross Validation",
+                " Test Time Augmentation (TTA)",
             ],
         ),
     ]
