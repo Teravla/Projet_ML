@@ -6,15 +6,20 @@ est présente. Dans un contexte médical, ces erreurs sont particulièrement gra
 """
 
 from src.decision.engine import ClinicalDecision
-from src.config.config import SEUIL_SECURITE_NEGATIF
-from src.enums.enums import ConfidenceLevel, HyperParametersInt, NoTumorAlias
+from src.enums.enums import (
+    ConfidenceLevel,
+    ConfidenceLevelThresholds,
+    HyperParametersInt,
+    NoTumorAlias,
+)
 
 
 NOTUMOR_ALIASES = tuple(NoTumorAlias.__members__.values())
 
 
 def appliquer_regle_securite_negatif(
-    decision: ClinicalDecision, seuil_securite: float = SEUIL_SECURITE_NEGATIF
+    decision: ClinicalDecision,
+    seuil_securite: float = ConfidenceLevelThresholds.SEUIL_SECURITE_NEGATIF,
 ) -> ClinicalDecision:
     """Applique la règle de sécurité pour les prédictions "Pas de tumeur".
 
@@ -57,7 +62,8 @@ def appliquer_regle_securite_negatif(
 
 
 def appliquer_regles_securite_batch(
-    decisions: list[ClinicalDecision], seuil_securite: float = SEUIL_SECURITE_NEGATIF
+    decisions: list[ClinicalDecision],
+    seuil_securite: float = ConfidenceLevelThresholds.SEUIL_SECURITE_NEGATIF,
 ) -> list[ClinicalDecision]:
     """Applique les règles de sécurité sur un lot de décisions.
 

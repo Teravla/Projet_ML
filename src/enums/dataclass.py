@@ -9,6 +9,17 @@ from src.data.pipeline import TrainValTestData
 from src.enums.enums import ConfidenceLevel, CostReview, TumorType
 
 
+@dataclass(frozen=True)
+class EvalBundleT3:
+    """Résumé des métriques de performance/incertitude."""
+
+    deterministic_acc: float
+    mc_acc: float
+    uncertainty_stats: dict[str, float]
+    entropy_mean: float
+    entropy_std: float
+
+
 @dataclass
 class DecisionThresholds:
     """Ensemble des seuils pour le moteur de décision."""

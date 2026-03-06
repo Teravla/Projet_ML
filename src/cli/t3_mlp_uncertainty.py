@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
 import numpy as np
 from sklearn.metrics import accuracy_score
 from src.data.pipeline import (
-    TrainValTestData,
     load_preprocessed_train_test,
     split_train_validation,
 )
-from src.enums.dataclass import RuntimeConfigT3
+from src.enums.dataclass import EvalBundleT3, RuntimeConfigT3, TrainValTestData
 from src.models.log_reg import flatten_images
 from src.models.mlp import (
     MLPTrainingConfig,
@@ -24,17 +22,6 @@ from src.models.uncertainty import mc_dropout_predict, summarize_uncertainty
 
 
 DataBundle = TrainValTestData
-
-
-@dataclass(frozen=True)
-class EvalBundle:
-    """Résumé des métriques de performance/incertitude."""
-
-    deterministic_acc: float
-    mc_acc: float
-    uncertainty_stats: dict[str, float]
-    entropy_mean: float
-    entropy_std: float
 
 
 def parse_args() -> argparse.Namespace:
@@ -108,7 +95,7 @@ def train_and_evaluate(
     data: DataBundle,
     args: argparse.Namespace,
     runtime: RuntimeConfigT3,
-) -> EvalBundle:
+) -> EvalBundleT3:
     """Entraîne le MLP puis évalue performance et incertitude."""
     model = build_mlp_classifier(
         input_dim=data.x_train.shape[1],
@@ -151,7 +138,7 @@ def train_and_evaluate(
         threshold=args.uncertainty_threshold,
     )
 
-    return EvalBundle(
+    return EvalBundleT3(
         deterministic_acc=deterministic_acc,
         mc_acc=mc_acc,
         uncertainty_stats=uncertainty_stats,

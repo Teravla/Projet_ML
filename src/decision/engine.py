@@ -16,20 +16,26 @@ def count_confidence_levels(decisions: list["ClinicalDecision"]) -> dict[str, in
 
     return {
         ConfidenceLevel.CONFIDENCE_HAUTE: sum(
-            1 for d in decisions if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE
+            1
+            for d in decisions
+            if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE
         ),
         ConfidenceLevel.CONFIDENCE_MOYENNE: sum(
-            1 for d in decisions if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_MOYENNE
+            1
+            for d in decisions
+            if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_MOYENNE
         ),
         ConfidenceLevel.CONFIDENCE_FAIBLE: sum(
-            1 for d in decisions if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_FAIBLE
+            1
+            for d in decisions
+            if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_FAIBLE
         ),
         ConfidenceLevel.CONFIDENCE_TRES_FAIBLE: sum(
-            1 for d in decisions if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
+            1
+            for d in decisions
+            if d.niveau_confiance == ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
         ),
     }
-
-
 
 
 def categoriser_confiance(
@@ -219,10 +225,15 @@ def statistiques_decisions(decisions: list[ClinicalDecision]) -> dict[str, float
 
     return {
         "n_total": n_total,
-        "taux_haute_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_HAUTE] / n_total,
-        "taux_moyenne_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_MOYENNE] / n_total,
-        "taux_faible_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_FAIBLE] / n_total,
-        "taux_tres_faible_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_TRES_FAIBLE]
+        "taux_haute_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_HAUTE]
+        / n_total,
+        "taux_moyenne_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_MOYENNE]
+        / n_total,
+        "taux_faible_confiance": confidence_counts[ConfidenceLevel.CONFIDENCE_FAIBLE]
+        / n_total,
+        "taux_tres_faible_confiance": confidence_counts[
+            ConfidenceLevel.CONFIDENCE_TRES_FAIBLE
+        ]
         / n_total,
         "taux_revision_requise": n_revisions / n_total,
         "taux_alertes_securite": n_alertes / n_total,

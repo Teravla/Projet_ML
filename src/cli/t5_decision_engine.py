@@ -36,8 +36,7 @@ from src.decision.triage import (
     generer_file_attente,
     statistiques_triage,
 )
-from src.config.config import DecisionThresholds
-from src.enums.dataclass import RuntimeConfigT5
+from src.enums.dataclass import DecisionThresholds, RuntimeConfigT5
 from src.enums.enums import ConfidenceLevel, HyperParametersStr, ModelType
 from src.models.cnn import build_cnn_classifier
 

@@ -102,6 +102,7 @@ class CostReview(IntEnum):
     COUT_FAUX_POSITIF = 100  # Euros - High cost for a false positive
     COUT_REVISION_HUMAINE = 50  # Euros - Cost of human review
 
+
 class NoTumorAlias(StrEnum):
     """Aliases for the "notumor" class to handle variations in naming."""
 

@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 
-from src.config.config import CostParameters
+from src.enums.dataclass import CostParameters
 
 
 def compter_fn_fp_tumeur(

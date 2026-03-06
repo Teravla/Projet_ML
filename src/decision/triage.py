@@ -7,59 +7,50 @@ du niveau de confiance, et des alertes de sécurité.
 
 from collections import Counter
 
-from src.decision.engine import (
-    ClinicalDecision,
-    CONFIDENCE_FAIBLE,
-    CONFIDENCE_HAUTE,
-    CONFIDENCE_MOYENNE,
-    CONFIDENCE_TRES_FAIBLE,
-)
-from src.config.config import (
-    GRAVITE_CLINIQUE,
-    PRIORITE_URGENTE,
-    PRIORITE_ELEVEE,
-    PRIORITE_NORMALE,
-    PRIORITE_ROUTINE,
-)
+from src.enums.dataclass import ClinicalDecision
+from src.enums.enums import ConfidenceLevel, PriorityLevel
 
 
 DEFAULT_GRAVITE = 3
 GRAVITE_SEUIL_URGENTE = 4
 GRAVITE_MALIGNE = 5
 GRAVITE_BENIGNE = 3
-MALIGNANCY_SUSPECT_LEVELS = {CONFIDENCE_MOYENNE, CONFIDENCE_FAIBLE}
+MALIGNANCY_SUSPECT_LEVELS = {
+    ConfidenceLevel.CONFIDENCE_MOYENNE,
+    ConfidenceLevel.CONFIDENCE_FAIBLE,
+}
 
 
 def _priorite_incertitude_tres_faible(gravite: int) -> str:
     """Détermine la priorité en cas de confiance très faible."""
     if gravite >= GRAVITE_SEUIL_URGENTE:
-        return PRIORITE_URGENTE
-    return PRIORITE_ELEVEE
+        return PriorityLevel.PRIORITY_URGENTE
+    return PriorityLevel.PRIORITY_ELEVEE
 
 
 def _priorite_cas_malin(niveau_confiance: str) -> str:
     """Détermine la priorité pour un cas de gravité maximale."""
-    if niveau_confiance == CONFIDENCE_HAUTE:
-        return PRIORITE_URGENTE
+    if niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE:
+        return PriorityLevel.PRIORITY_URGENTE
     if niveau_confiance in MALIGNANCY_SUSPECT_LEVELS:
-        return PRIORITE_ELEVEE
-    return PRIORITE_URGENTE
+        return PriorityLevel.PRIORITY_ELEVEE
+    return PriorityLevel.PRIORITY_URGENTE
 
 
 def _priorite_cas_benin(niveau_confiance: str) -> str:
     """Détermine la priorité pour un cas bénin."""
-    if niveau_confiance == CONFIDENCE_HAUTE:
-        return PRIORITE_NORMALE
-    return PRIORITE_ELEVEE
+    if niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE:
+        return PriorityLevel.PRIORITY_NORMALE
+    return PriorityLevel.PRIORITY_ELEVEE
 
 
 def _priorite_pas_tumeur(niveau_confiance: str) -> str:
     """Détermine la priorité pour un cas non tumoral."""
-    if niveau_confiance == CONFIDENCE_HAUTE:
-        return PRIORITE_ROUTINE
-    if niveau_confiance == CONFIDENCE_MOYENNE:
-        return PRIORITE_NORMALE
-    return PRIORITE_ELEVEE
+    if niveau_confiance == ConfidenceLevel.CONFIDENCE_HAUTE:
+        return PriorityLevel.PRIORITY_ROUTINE
+    if niveau_confiance == ConfidenceLevel.CONFIDENCE_MOYENNE:
+        return PriorityLevel.PRIORITY_NORMALE
+    return PriorityLevel.PRIORITY_ELEVEE
 
 
 def _priorite_par_gravite(gravite: int, niveau_confiance: str) -> str:
@@ -93,18 +84,15 @@ def determiner_priorite(
     Returns:
         Priorité: URGENTE, ELEVEE, NORMALE, ou ROUTINE
     """
-    if gravites is None:
-        gravites = GRAVITE_CLINIQUE
-
     # Règle 1: Alerte de sécurité = priorité urgente
     if decision.alerte_securite:
-        return PRIORITE_URGENTE
+        return PriorityLevel.PRIORITY_URGENTE
 
     classe_norm = decision.classe_predite.lower()
     gravite = gravites.get(classe_norm, DEFAULT_GRAVITE)
 
     # Règle 2: Incertitude très élevée = priorité élevée ou urgente
-    if decision.niveau_confiance == CONFIDENCE_TRES_FAIBLE:
+    if decision.niveau_confiance == ConfidenceLevel.CONFIDENCE_TRES_FAIBLE:
         return _priorite_incertitude_tres_faible(gravite)
 
     # Règle 3: Combiner gravité de la classe et confiance
@@ -154,10 +142,10 @@ def trier_par_priorite(decisions: list[ClinicalDecision]) -> list[ClinicalDecisi
         Liste triée par priorité décroissante
     """
     ordre_priorite = {
-        PRIORITE_URGENTE: 4,
-        PRIORITE_ELEVEE: 3,
-        PRIORITE_NORMALE: 2,
-        PRIORITE_ROUTINE: 1,
+        PriorityLevel.PRIORITY_URGENTE: 4,
+        PriorityLevel.PRIORITY_ELEVEE: 3,
+        PriorityLevel.PRIORITY_NORMALE: 2,
+        PriorityLevel.PRIORITY_ROUTINE: 1,
         "A_DETERMINER": 0,  # Cas non traité
     }
 
@@ -197,10 +185,10 @@ def statistiques_triage(decisions: list[ClinicalDecision]) -> dict:
     # Compter les priorités
     compteur = Counter(d.priorite for d in decisions)
 
-    n_urgente = compteur.get(PRIORITE_URGENTE, 0)
-    n_elevee = compteur.get(PRIORITE_ELEVEE, 0)
-    n_normale = compteur.get(PRIORITE_NORMALE, 0)
-    n_routine = compteur.get(PRIORITE_ROUTINE, 0)
+    n_urgente = compteur.get(PriorityLevel.PRIORITY_URGENTE, 0)
+    n_elevee = compteur.get(PriorityLevel.PRIORITY_ELEVEE, 0)
+    n_normale = compteur.get(PriorityLevel.PRIORITY_NORMALE, 0)
+    n_routine = compteur.get(PriorityLevel.PRIORITY_ROUTINE, 0)
 
     return {
         "n_total": n_total,
@@ -231,10 +219,10 @@ def generer_file_attente(
         Dictionnaire {priorité: [décisions]}
     """
     files = {
-        PRIORITE_URGENTE: [],
-        PRIORITE_ELEVEE: [],
-        PRIORITE_NORMALE: [],
-        PRIORITE_ROUTINE: [],
+        PriorityLevel.PRIORITY_URGENTE: [],
+        PriorityLevel.PRIORITY_ELEVEE: [],
+        PriorityLevel.PRIORITY_NORMALE: [],
+        PriorityLevel.PRIORITY_ROUTINE: [],
     }
 
     for decision in decisions:
